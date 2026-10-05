@@ -126,7 +126,6 @@
                 </select>
             </div>
             
-            <!-- NUEVO FILTRO: ESTADO FÍSICO -->
             <div>
                 <label class="block text-xs font-semibold text-gray-400 mb-1.5 uppercase tracking-wider">Estado Físico</label>
                 <select name="estado" class="bg-[#12141c] border border-gray-700 text-white rounded-lg p-2.5 w-full text-sm focus:ring-2 focus:ring-blue-500 outline-none transition">
@@ -333,6 +332,13 @@
                             <option value="{{ $ubicacion->ubi_id }}">{{ $ubicacion->ubi_nombre }}</option>
                         @endforeach
                     </select>
+                </div>
+
+                <div class="flex items-center justify-start space-x-3 mt-6 pt-4 border-t border-gray-700">
+                    <button type="submit" 
+                            class="px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-lg text-sm font-medium shadow-lg transition">
+                        Guardar Cambios
+                    </button>
                 </div>
             </div>
         </form>
