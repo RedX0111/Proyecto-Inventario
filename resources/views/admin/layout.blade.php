@@ -2,8 +2,15 @@
 <html lang="es">
 <head>
     <meta charset="UTF-8">
-    <title>@yield('title', 'Panel Administrativo') | Auditoría Patrimonial</title>
+    <title>@yield('title', 'Panel Administrativo') | Inventario Patrimonial</title>
+    
+    <!-- Alpine.js -->
+    <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+
+    <!-- Tailwind CSS por CDN (Soluciona el error de Vite inmediatamente) -->
     <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- Chart.js -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     
     <!-- Lógica CSS para el Modo Claro -->
@@ -69,14 +76,13 @@
             </nav>
         </div>
 
-        <!-- Pie de barra lateral (Usuario + Botón Cerrar Sesión Mejorado) -->
+        <!-- Pie de barra lateral -->
         <div class="p-4 border-t border-gray-800 bg-[#12141c]/50">
             <div class="flex items-center justify-between gap-2">
                 <div class="truncate pr-1">
                     <p class="text-xs font-bold text-white truncate">{{ Auth::user()->usu_nombres ?? 'Administrador' }}</p>
                     <p class="text-[10px] text-gray-400 truncate">Administrador</p>
                 </div>
-                <!-- Botón Cerrar Sesión Estilizado -->
                 <form action="{{ route('logout') }}" method="POST" class="m-0 shrink-0">
                     @csrf
                     <button type="submit" class="group relative bg-gray-800 hover:bg-red-600 text-gray-300 hover:text-white border border-gray-700 hover:border-red-500 p-2.5 rounded-xl transition-all duration-200 flex items-center justify-center shadow-md" title="Cerrar Sesión">

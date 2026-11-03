@@ -82,24 +82,48 @@
                                     <span class="px-2 py-1 bg-rose-950 text-rose-400 rounded-md text-xs font-bold border border-rose-800/50">INACTIVO</span>
                                 <?php endif; ?>
                             </td>
-                            <td class="py-3 px-4 text-center">
-                                <div class="flex justify-center items-center gap-2">
-                                    <!-- Botón Editar Mejorado -->
-                                    <button onclick="abrirModalEditar(<?php echo $usr->usu_id; ?>, '<?php echo addslashes($usr->usu_dni); ?>', '<?php echo addslashes($usr->usu_nombres); ?>', '<?php echo addslashes($usr->usu_apellidos); ?>', '<?php echo addslashes($usr->usu_correo ?? ''); ?>', <?php echo $usr->rol_id; ?>, <?php echo$usr->usu_activo; ?>)" 
-                                            class="px-3 py-1.5 bg-blue-900/30 text-blue-400 border border-blue-800/50 rounded-lg hover:bg-blue-600 hover:text-white transition text-[10px] font-bold tracking-wider uppercase">
-                                        Editar
-                                    </button>
+                            <td class="px-5 py-4 text-center">
+                                <div class="flex items-center justify-center gap-2">
                                     
-                                    <!-- Botón Desactivar Mejorado -->
-                                    <?php if($usr->usu_id !== Auth::id()): ?>
-                                    <form action="<?php echo route('admin.usuarios.destroy', $usr->usu_id); ?>" method="POST" class="inline">
-                                        @csrf
-                                        @method('DELETE')
-                                        <button type="submit" class="px-3 py-1.5 bg-rose-900/30 text-rose-400 border border-rose-800/50 rounded-lg hover:bg-rose-600 hover:text-white transition text-[10px] font-bold tracking-wider uppercase">
-                                            Desactivar
-                                        </button>
-                                    </form>
-                                    <?php endif; ?>
+                                    <!-- Botón de Editar configurado -->
+                                    <button type="button" 
+                                            onclick="abrirModalEditar(this)"
+                                            data-id="{{ $usr->usu_id }}"
+                                            data-dni="{{ $usr->usu_dni }}"
+                                            data-nombres="{{ $usr->usu_nombres }}"
+                                            data-apellidos="{{ $usr->usu_apellidos }}"
+                                            data-correo="{{ $usr->usu_correo }}"
+                                            data-rol="{{ $usr->rol_id }}"
+                                            data-activo="{{ $usr->usu_activo }}"
+                                            class="bg-blue-500/10 text-blue-400 hover:bg-blue-500 hover:text-white border border-blue-500/20 px-3 py-1.5 rounded-lg text-xs font-semibold transition" title="Editar">
+                                        ✏️ Editar
+                                    </button>
+
+                                    <!-- Lógica para ocultar el botón si es el usuario actual -->
+                                    @if(auth()->id() != $usr->usu_id)
+                                        <!-- Formulario para Cambiar Estado -->
+                                        <form action="{{ route('admin.usuarios.destroy', $usr->usu_id) }}" method="POST" class="m-0">
+                                            @csrf
+                                            @method('DELETE') 
+                                            
+                                            @if($usr->usu_activo == 1)
+                                                <!-- Botón de Desactivar (Rojo) -->
+                                                <button type="submit" 
+                                                        class="bg-red-500/10 text-red-400 hover:bg-red-500 hover:text-white border border-red-500/20 px-3 py-1.5 rounded-lg text-xs font-semibold transition flex items-center gap-1.5"
+                                                        onclick="return confirm('¿Estás seguro de desactivar a este usuario? Perderá el acceso al sistema.')" title="Desactivar acceso">
+                                                    Desactivar
+                                                </button>
+                                            @else
+                                                <!-- Botón de Activar (Verde Esmeralda) -->
+                                                <button type="submit" 
+                                                        class="bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500 hover:text-white border border-emerald-500/20 px-3 py-1.5 rounded-lg text-xs font-semibold transition flex items-center gap-1.5"
+                                                        onclick="return confirm('¿Estás seguro de reactivar a este usuario? Recuperará su acceso al sistema.')" title="Reactivar acceso">
+                                                    Activar
+                                                </button>
+                                            @endif
+                                        </form>
+                                    @endif
+                                    
                                 </div>
                             </td>
                         </tr>
@@ -154,7 +178,7 @@
                         </div>
                     </div>
 
-                    <div class="flex items-center gap-3 mt-4 p-4 bg-[#1e2330] rounded-xl border border-gray-700">
+                    <div id="contenedor_estado" class="flex items-center gap-3 mt-4 p-4 bg-[#1e2330] rounded-xl border border-gray-700">
                         <input type="checkbox" id="edit_activo" name="usu_activo" value="1" class="w-5 h-5 text-blue-600 bg-gray-900 border-gray-600 rounded">
                         <label class="text-sm font-bold text-gray-300">Mantener este usuario activo en el sistema</label>
                     </div>
@@ -169,15 +193,23 @@
     </div>
 
     <script>
-        function abrirModalEditar(id, dni, nombres, apellidos, correo, rol, activo) {
+        function abrirModalEditar(btn) {
+            const id = btn.dataset.id;
             document.getElementById('formEditar').action = `/dashboard/usuarios/${id}`;
-            document.getElementById('edit_dni').value = dni;
-            document.getElementById('edit_nombres').value = nombres;
-            document.getElementById('edit_apellidos').value = apellidos;
-            document.getElementById('edit_correo').value = correo;
-            document.getElementById('edit_password').value = ''; // Siempre limpiar contraseña
-            document.getElementById('edit_rol').value = rol;
-            document.getElementById('edit_activo').checked = (activo == 1);
+            document.getElementById('edit_dni').value = btn.dataset.dni;
+            document.getElementById('edit_nombres').value = btn.dataset.nombres;
+            document.getElementById('edit_apellidos').value = btn.dataset.apellidos;
+            document.getElementById('edit_correo').value = btn.dataset.correo || '';
+            document.getElementById('edit_password').value = '';
+            document.getElementById('edit_rol').value = btn.dataset.rol;
+            document.getElementById('edit_activo').checked = (btn.dataset.activo == "1");
+
+            if (id == "{{ auth()->id() }}") {
+                document.getElementById('contenedor_estado').style.display = 'none';
+            } else {
+                document.getElementById('contenedor_estado').style.display = 'flex';
+            }
+
             document.getElementById('modalEditar').classList.remove('hidden');
         }
         function cerrarModalEditar() {

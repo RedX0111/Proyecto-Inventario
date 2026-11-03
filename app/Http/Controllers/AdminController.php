@@ -8,26 +8,22 @@ use Illuminate\Support\Facades\Http;
 
 class AdminController extends Controller
 {
-    /**
-     * Muestra el Dashboard Administrativo con KPIs, gráficos, filtros y tabla de padrón.
-     */
     public function index(Request $request)
     {
-        // 1. Obtener los períodos fiscales directamente de tu tabla bd_periodos
+        // 1. Obtener los períodos fiscales
         $periodos = DB::table('bd_periodos_fiscales')->orderBy('per_anio', 'desc')->get();
     
-        // Período seleccionado por defecto
+        // Período seleccionado
         $periodoSeleccionado = $request->input('periodo');
         if (!$periodoSeleccionado) {
             $periodoActivo = $periodos->where('per_cerrado', 0)->first();
             $periodoSeleccionado = $periodoActivo ? $periodoActivo->per_id : ($periodos->first()->per_id ?? 1);
         }
 
-        // Obtener el año correspondiente al período seleccionado (ej: '2026' o '2025')
         $periodoActualObj = $periodos->where('per_id', $periodoSeleccionado)->first();
         $anioSeleccionado = $periodoActualObj ? $periodoActualObj->per_anio : date('Y');
 
-        // 2. Obtener ubicaciones y catálogos para los filtros y modales
+        // 2. Obtener catálogos
         try {
             $ubicaciones = DB::table('bd_ubicaciones')->orderBy('ubi_nombre')->get();
             $colores = DB::table('col_colores')->orderBy('col_nombre')->get();
@@ -39,10 +35,9 @@ class AdminController extends Controller
             $ubicaciones = $colores = $modelos = $clasificadores = $marcas = $estados = collect([]);
         }
 
-        // 3. Consulta base unificada para la tabla del Padrón / Dashboard (Usando la vista maestra por año)
+        // 3. Consulta base para la tabla principal
         $query = DB::table('v_bd_tabla_master')->where('anio_auditoria', $anioSeleccionado);
 
-        // Filtro de búsqueda (Código o Denominación)
         if ($request->filled('buscar')) {
             $busqueda = $request->input('buscar');
             $query->where(function($q) use ($busqueda) {
@@ -50,82 +45,60 @@ class AdminController extends Controller
                   ->orWhere('denominacion', 'like', "%{$busqueda}%");
             });
         }
-
-        // Filtro por Ubicación
-        if ($request->filled('ubicacion')) {
-            $query->where('ubicacion', $request->input('ubicacion'));
-        }
-
-        // Filtro por Estado Físico
-        if ($request->filled('estado')) {
-            $query->where('estado', $request->input('estado'));
-        }
-
-        // Filtro por Alerta de Movimiento
+        if ($request->filled('ubicacion')) $query->where('ubicacion', $request->input('ubicacion'));
+        if ($request->filled('estado')) $query->where('estado', $request->input('estado'));
         if ($request->filled('alerta')) {
             $alertaVal = $request->input('alerta');
-            $query->where(DB::raw("alerta_movimiento COLLATE utf8mb4_general_ci"), '=', DB::raw("'$alertaVal' COLLATE utf8mb4_general_ci"));
+            $query->where('alerta_movimiento', 'ILIKE', $alertaVal);
         }
 
-        // Paginación final de la tabla
         $registrosVista = $query->orderBy('codigo_patrimonial', 'asc')->paginate(15);
 
-        // 4. Indicadores Clave (KPIs) robustos filtrados por el año seleccionado
+        // 4. Indicadores Clave (KPIs)
         $totalActivos = DB::table('v_bd_tabla_master')->where('anio_auditoria', $anioSeleccionado)->count();
         
         $verificados = DB::table('v_bd_tabla_master')
             ->where('anio_auditoria', $anioSeleccionado)
-            ->where(DB::raw("constatado_actual COLLATE utf8mb4_general_ci"), '=', DB::raw("'CENSADO' COLLATE utf8mb4_general_ci"))
+            ->where('constatado_actual', 'ILIKE', 'CENSADO')
             ->count();
             
-        // Conteo seguro para pendientes en la tabla temporal staging
-        try {
-            $pendientes = DB::table('bd_staging_censo')->count();
-        } catch (\Exception $e) {
-            $pendientes = 0;
-        }
-
-        $anioAnterior = $anioSeleccionado - 1;
-
-        try {
-            $alertasMovimiento = DB::table('bd_staging_censo')
-                ->whereNotNull('alerta_movimiento')
-                ->where('alerta_movimiento', '!=', '')
-                ->where('alerta_movimiento', 'not like', '%SIN VARIACIÓN%')
-                ->where('alerta_movimiento', 'not like', '%NORMAL%')
-                ->count();
-        } catch (\Exception $e) {
-            $alertasMovimiento = 0;
-        }
-
+        $pendientes = $totalActivos - $verificados;
         $porcentajeAvance = $totalActivos > 0 ? round(($verificados / $totalActivos) * 100, 1) : 0;
 
-        // KPI corregido: Alertas de reubicación evaluando de forma segura
         $alertasMovimiento = DB::table('v_bd_tabla_master')
             ->where('anio_auditoria', $anioSeleccionado)
             ->where(function($q) {
-                $q->where(DB::raw("alerta_movimiento COLLATE utf8mb4_general_ci"), 'LIKE', DB::raw("'%REUBICADO%' COLLATE utf8mb4_general_ci"))
-                  ->orWhere(DB::raw("alerta_movimiento COLLATE utf8mb4_general_ci"), 'LIKE', DB::raw("'%ALERTA%' COLLATE utf8mb4_general_ci"));
+                $q->where('alerta_movimiento', 'ILIKE', '%REUBICADO%')
+                ->orWhere('alerta_movimiento', 'ILIKE', '%ALERTA%');
             })
             ->count();
-        
-        $porcentajeAvance = $totalActivos > 0 ? round(($verificados / $totalActivos) * 100, 1) : 0;
 
-        // 5. Datos para los Gráficos Estadísticos (Chart.js)
-        $topUbicaciones = DB::table('v_bd_tabla_master')
+        // 5. Gráfico de Ubicaciones (Consulta optimizada)
+        $ubicacionesStats = DB::table('v_bd_tabla_master')
             ->where('anio_auditoria', $anioSeleccionado)
-            ->select('ubicacion', 
-                DB::raw("SUM(CASE WHEN constatado_actual COLLATE utf8mb4_general_ci = 'CENSADO' COLLATE utf8mb4_general_ci THEN 1 ELSE 0 END) as verificados"),
-                DB::raw("SUM(CASE WHEN constatado_actual COLLATE utf8mb4_general_ci != 'CENSADO' COLLATE utf8mb4_general_ci THEN 1 ELSE 0 END) as pendientes")
+            ->select(
+                'ubicacion',
+                DB::raw('COUNT(*) as total_activos'),
+                // Contamos cuántos de esos activos ya están "CENSADOS"
+                DB::raw("SUM(CASE WHEN constatado_actual ILIKE 'CENSADO' THEN 1 ELSE 0 END) as verificados")
             )
             ->groupBy('ubicacion')
+            ->orderBy('total_activos', 'desc') 
             ->limit(10)
             ->get();
 
-        $chartUbiLabels = $topUbicaciones->pluck('ubicacion');
-        $chartUbiVerificados = $topUbicaciones->pluck('verificados');
-        $chartUbiPendientes = $topUbicaciones->pluck('pendientes');
+        $chartUbiLabels = [];
+        $chartUbiVerificados = [];
+        $chartUbiPendientes = [];
 
+        foreach ($ubicacionesStats as $stat) {
+            $chartUbiLabels[] = $stat->ubicacion;
+            $chartUbiVerificados[] = (int) $stat->verificados;
+            // El pendiente se calcula restando lo verificado al total de activos en esa ubicación
+            $chartUbiPendientes[] = (int) $stat->total_activos - (int) $stat->verificados; 
+        }
+
+        // Gráfico de Estados Físicos
         $estadosFisicos = DB::table('v_bd_tabla_master')
             ->where('anio_auditoria', $anioSeleccionado)
             ->select('estado', DB::raw('count(*) as total'))
@@ -135,6 +108,34 @@ class AdminController extends Controller
         $chartEstLabels = $estadosFisicos->pluck('estado');
         $chartEstData = $estadosFisicos->pluck('total');
 
+        // Gráfico de Tipos (Nuevo)
+        $tiposActivos = DB::table('v_bd_tabla_master')
+            ->where('anio_auditoria', $anioSeleccionado)
+            ->select('tipo', DB::raw('count(*) as total'))
+            ->groupBy('tipo')
+            ->orderBy('total', 'desc')
+            ->limit(5)
+            ->get();
+
+        $chartTipoLabels = $tiposActivos->pluck('tipo');
+        $chartTipoData = $tiposActivos->pluck('total');
+
+        // 6. NUEVO GRÁFICO: Distribución por Tipo de Activo
+        $tiposActivos = DB::table('v_bd_tabla_master')
+            ->where('anio_auditoria', $anioSeleccionado)
+            ->whereNotNull('tipo') // Ignoramos nulos
+            ->where('tipo', '!=', '') // Ignoramos vacíos
+            ->select('tipo', DB::raw('COUNT(*) as total'))
+            ->groupBy('tipo')
+            ->orderBy('total', 'desc') // Ordenamos del tipo con más activos al menor
+            ->limit(7) // Traemos el Top 7 para no saturar el gráfico visualmente
+            ->get();
+
+        // Convertimos a arreglos simples para que Chart.js los procese sin errores
+        $chartTipoLabels = $tiposActivos->pluck('tipo')->toArray();
+        $chartTipoData = $tiposActivos->pluck('total')->toArray();
+
+        // Retorno a la vista
         return view('admin.dashboard', compact(
             'periodos',
             'periodoSeleccionado',
@@ -150,6 +151,10 @@ class AdminController extends Controller
             'chartUbiPendientes',
             'chartEstLabels',
             'chartEstData',
+            'chartTipoLabels',
+            'chartTipoData',
+            'chartTipoLabels',
+            'chartTipoData',
             'colores',
             'modelos',
             'clasificadores',
@@ -184,35 +189,25 @@ class AdminController extends Controller
             }
 
             foreach ($items as $item) {
-                DB::statement('CALL sp_procesar_item_censo_complejo(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)', [
-                    $item['orden'] ?? null, 
-                    $item['codigo'] ?? null, 
-                    
-                    // 1. DENOMINACIÓN
-                    $item['denominacion'] ?? 'SIN DENOMINACION', 
-                    
-                    $item['marca'] ?? '', 
-                    $item['modelo'] ?? '', 
-                    $item['tipo'] ?? '', 
-                    $item['color'] ?? '',
-                    $item['serie'] ?? '', 
-                    
-                    // 2. DIMENSIONES
-                    $item['dimensiones'] ?? 'SIN DIMENSIONES', 
-                    
-                    $item['fecha'] ?? now()->toDateString(),
-                    
-                    // 3. ESTADO
-                    $item['estado'] ?? 'BUENO', 
-                    
-                    // 4. UBICACIÓN
-                    $item['ubicacion'] ?? 'GENERAL', 
-                    
-                    $item['observaciones'] ?? '',
-                    $item['dni_auditor'] ?? 'SISTEMA',
-                    $item['anio_auditoria'] ?? date('Y'),
-                    $item['constatado_actual'] ?? 'CENSADO',
-                    $item['alerta_movimiento'] ?? 'SIN VARIACIÓN'
+                DB::table('bd_staging_censo')->insert([
+                    'stg_orden' => $item['orden'] ?? null,
+                    'codigo_patrimonial' => $item['codigo'] ?? null,
+                    'denominacion' => $item['denominacion'] ?? 'SIN DENOMINACION',
+                    'marca' => $item['marca'] ?? '',
+                    'modelo' => $item['modelo'] ?? '',
+                    'tipo' => $item['tipo'] ?? '',
+                    'color' => $item['color'] ?? '',
+                    'serie' => $item['serie'] ?? '',
+                    'dimensiones' => $item['dimensiones'] ?? 'SIN DIMENSIONES',
+                    'fecha_censo' => $item['fecha'] ?? now()->toDateString(),
+                    'anio_auditoria' => $item['anio_auditoria'] ?? date('Y'),
+                    'estado' => $item['estado'] ?? 'BUENO',
+                    'constatado_actual' => $item['constatado_actual'] ?? 'CENSADO',
+                    'alerta_movimiento' => $item['alerta_movimiento'] ?? 'SIN VARIACIÓN',
+                    'ubicacion' => $item['ubicacion'] ?? 'GENERAL',
+                    'observaciones' => $item['observaciones'] ?? '',
+                    'dni_auditor' => $item['dni_auditor'] ?? 'SISTEMA',
+                    'creado_en' => now(),
                 ]);
             }
 
@@ -231,11 +226,40 @@ class AdminController extends Controller
     public function aprobarLote()
     {
         try {
-            // Ejecuta el procedimiento almacenado que consolida desde los lotes y censos hacia el maestro
-            DB::statement('CALL sp_aprobar_lote_censo()');
+            DB::beginTransaction();
 
+            // 1. Obtener todos los registros encolados en staging
+            $registros = DB::table('bd_staging_censo')->get();
+
+            if ($registros->isEmpty()) {
+                return back()->with('error', 'No hay datos en el lote para aprobar.');
+            }
+
+            // 2. Procesar cada registro hacia el padrón maestro
+            foreach ($registros as $reg) {
+                // updateOrInsert busca por el primer arreglo (act_codigo). 
+                // Si existe, lo actualiza con el segundo arreglo; si no, lo crea.
+                DB::table('bd_activos_maestro')->updateOrInsert(
+                    ['act_codigo' => $reg->codigo_patrimonial],
+                    [
+                        'act_denominacion' => $reg->denominacion,
+                        'act_serie' => $reg->serie,
+                        'act_dimensiones' => $reg->dimensiones,
+                        'updated_at' => now(),
+                        // Nota: Si tu SP antiguo resolvía los IDs de marca, color o modelo 
+                        // a partir del texto, debes agregar esas consultas previas aquí.
+                    ]
+                );
+            }
+
+            // 3. Limpiar la tabla de staging una vez consolidados los datos
+            DB::table('bd_staging_censo')->truncate();
+
+            DB::commit();
             return back()->with('success', '¡Lote aprobado y consolidado en el padrón maestro exitosamente!');
+
         } catch (\Exception $e) {
+            DB::rollBack();
             return back()->with('error', 'Error al aprobar el lote: ' . $e->getMessage());
         }
     }
@@ -294,7 +318,7 @@ class AdminController extends Controller
                     'mod_id' => $request->input('mod_id'),
                     'col_id' => $request->input('col_id'),
                     'cla_id' => $request->input('cla_id'),
-                    'act_actualizado_en' => now(),
+                    'updated_at' => now(),
                 ]);
 
             // 2. Buscamos el act_id para registrar la trazabilidad sin interferir con la actualización
@@ -304,11 +328,9 @@ class AdminController extends Controller
                 DB::table('aud_bitacora_trazabilidad')->insert([
                     'act_id' => $actId,
                     'usu_id' => auth()->id() ?? 1,
-                    'aud_tipo_evento' => 'ACTUALIZACION',
-                    'aud_ubicacion_origen_id' => null,
-                    'aud_ubicacion_destino_id' => null,
+                    'aud_accion' => 'ACTUALIZACION',
                     'aud_detalle' => "Actualización manual del activo {$codigo}: Denominación cambiada a '{$request->input('denominacion')}'",
-                    'aud_creado_en' => now(),
+                    'created_at' => now(),
                 ]);
             }
 
@@ -329,7 +351,7 @@ class AdminController extends Controller
             ->select('bd_usuarios.*', 'bd_roles.rol_nombre')
             ->paginate(10);
 
-        $roles = DB::table('bd_roles')->get();
+        $roles = DB::table('bd_roles')->get()->unique('rol_nombre');
 
         return view('admin.usuarios', compact('usuarios', 'roles'));
     }
@@ -343,16 +365,132 @@ class AdminController extends Controller
                 'usu_nombres' => $request->input('nombres') ?? $request->input('usu_nombres'),
                 'usu_apellidos' => $request->input('apellidos') ?? $request->input('usu_apellidos'),
                 'usu_correo' => $request->input('correo') ?? $request->input('usu_correo'),
-                'usu_password' => bcrypt($request->input('password') ?? '12345678'), // Contraseña por defecto si viene vacía
-                'rol_id' => $request->input('rol_id') ?? 2, // 1 para Admin, 2 para Observador por defecto
+                'password' => bcrypt($request->input('password') ?? '12345678'), 
+                'rol_id' => $request->input('rol_id') ?? 2, 
                 'usu_activo' => 1,
-                'usu_creado_en' => now(),
+                'created_at' => now(),
             ]);
 
             return back()->with('success', '¡Usuario registrado correctamente!');
 
         } catch (\Exception $e) {
             return back()->with('error', 'Error al registrar el usuario: ' . $e->getMessage());
+        }
+    }
+
+    /**
+     * Actualiza un usuario existente en la base de datos.
+     */
+    public function usuariosUpdate(Request $request, $id)
+    {
+        try {
+            // Preparamos los datos a actualizar adaptándonos a los campos del formulario
+            $datosActualizacion = [
+                'usu_dni' => $request->input('dni') ?? $request->input('usu_dni'),
+                'usu_nombres' => $request->input('nombres') ?? $request->input('usu_nombres'),
+                'usu_apellidos' => $request->input('apellidos') ?? $request->input('usu_apellidos'),
+                'usu_correo' => $request->input('correo') ?? $request->input('usu_correo'),
+                'rol_id' => $request->input('rol_id'),
+            ];
+
+            // Si el usuario ingresó una nueva contraseña, la actualizamos cifrada; si no, la omitimos
+            if ($request->filled('password')) {
+                $datosActualizacion['password'] = bcrypt($request->input('password'));
+            }
+
+            // Ejecutamos la actualización basada en el identificador único (usu_id)
+            DB::table('bd_usuarios')
+                ->where('usu_id', $id)
+                ->update($datosActualizacion);
+
+            return back()->with('success', '¡Usuario actualizado correctamente!');
+
+        } catch (\Exception $e) {
+            return back()->with('error', 'Error al actualizar el usuario: ' . $e->getMessage());
+        }
+    }
+
+    public function dashboardIndex()
+    {
+        // 1. Total de activos en el padrón maestro
+        $totalActivos = DB::table('bd_activos_maestro')->count();
+
+        // 2. Activos verificados en el censo actual (ej. año 2026 o último censo)
+        $activosVerificados = DB::table('cen_censos')
+            ->whereYear('cer_fecha', 2026)
+            ->distinct('act_id')
+            ->count('act_id');
+
+        // Cobertura de verificación
+        $cobertura = $totalActivos > 0 ? round(($activosVerificados / $totalActivos) * 100) : 0;
+        $pendientes = $totalActivos - $activosVerificados;
+
+        // 3. Alertas de movimiento / trazabilidad (ej: eventos registrados en la bitácora)
+        $alertasNoEncontradas = DB::table('aud_bitacora_trazabilidad')
+            ->where('aud_accion', 'NO_ENCONTRADO')
+            ->count();
+
+        $alertasMovimiento = DB::table('aud_bitacora_trazabilidad')
+            ->where('aud_accion', 'CAMBIO_UBICACION')
+            ->count();
+
+        // Detalle de últimas alertas para la tabla de trazabilidad
+        $detalleAlertas = DB::table('aud_bitacora_trazabilidad')
+            ->join('bd_activos_maestro', 'aud_bitacora_trazabilidad.act_id', '=', 'bd_activos_maestro.act_id')
+            ->select(
+                'bd_activos_maestro.act_codigo as codigo',
+                'bd_activos_maestro.act_denominacion as activo',
+                'aud_bitacora_trazabilidad.aud_detalle as movimiento',
+                'aud_bitacora_trazabilidad.created_at as fecha'
+            )
+            ->orderBy('aud_bitacora_trazabilidad.created_at', 'desc')
+            ->limit(5)
+            ->get();
+
+        return view('admin.dashboard', compact(
+            'totalActivos',
+            'activosVerificados',
+            'cobertura',
+            'pendientes',
+            'alertasNoEncontradas',
+            'alertasMovimiento',
+            'detalleAlertas'
+        ));
+    }
+
+    /**
+     * Alterna el estado de un usuario (Activar / Desactivar).
+     */
+    public function usuariosDestroy($id)
+    {
+        try {
+            // Evitar que el usuario administrador cambie el estado de su propia cuenta
+            if (auth()->check() && auth()->id() == $id) {
+                return back()->with('error', 'No puedes cambiar el estado de tu propia cuenta mientras estás en sesión.');
+            }
+
+            // Buscamos el usuario actual
+            $usuario = DB::table('bd_usuarios')->where('usu_id', $id)->first();
+
+            if (!$usuario) {
+                return back()->with('error', 'Usuario no encontrado.');
+            }
+
+            // Invertimos el estado lógico (Si es 1 pasa a 0, si es 0 pasa a 1)
+            $nuevoEstado = $usuario->usu_activo == 1 ? 0 : 1;
+            
+            // Mensaje dinámico según la acción realizada
+            $mensaje = $nuevoEstado == 1 ? '¡Usuario reactivado correctamente!' : '¡Usuario desactivado correctamente!';
+
+            // Actualizamos la BD
+            DB::table('bd_usuarios')
+                ->where('usu_id', $id)
+                ->update(['usu_activo' => $nuevoEstado]);
+
+            return back()->with('success', $mensaje);
+
+        } catch (\Exception $e) {
+            return back()->with('error', 'Error al cambiar el estado del usuario: ' . $e->getMessage());
         }
     }
 }

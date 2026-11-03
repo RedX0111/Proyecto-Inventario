@@ -40,8 +40,8 @@ class AuthController extends Controller
             return back()->withErrors(['usu_dni' => 'El usuario se encuentra inactivo.'])->onlyInput('usu_dni');
         }
 
-        // 4. Validar la contraseña cifrada
-        if (!Hash::check($request->password, $user->usu_password)) {
+        // 4. Validar la contraseña cifrada (CORREGIDO: Ahora usa ->password)
+        if (!Hash::check($request->password, $user->password)) {
             return back()->withErrors(['usu_dni' => 'La contraseña es incorrecta.'])->onlyInput('usu_dni');
         }
 
@@ -50,13 +50,11 @@ class AuthController extends Controller
         $request->session()->regenerate();
 
         // 6. Redirección inteligente basada en el ID del rol (rol_id)
-        // 1 = ADMINISTRADOR, 2 = AUDITOR_LIMPIEZA, 3 = OPERADOR_CAMPO (Ajusta los números según tu tabla bd_roles)
         if ($user->rol_id == 1) {
             return redirect()->route('admin.dashboard');
         } elseif ($user->rol_id == 2) {
             return redirect()->route('auditoria.limpieza');
         } else {
-            // OPERADOR_CAMPO u otros roles por defecto
             return redirect()->route('auditoria.padron');
         }
     }

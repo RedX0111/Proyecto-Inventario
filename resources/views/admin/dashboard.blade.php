@@ -1,20 +1,28 @@
 @extends('admin.layout')
 
 @section('content')
-<div class="max-w-[96%] xl:max-w-7xl mx-auto pb-10 px-2 sm:px-4">
 
-    <!-- ENCABEZADO Y ACCIONES -->
-    <div class="flex flex-col xl:flex-row justify-between items-start xl:items-center mb-8 gap-5">
+<style>
+    [x-cloak] { display: none !important; }
+</style>
+
+<!-- Contenedor principal con memoria de pestaña activa -->
+<div class="max-w-[96%] xl:max-w-7xl mx-auto pb-10 px-2 sm:px-4 text-gray-100">
+
+    <!-- ENCABEZADO Y ACCIONES GENERALES -->
+    <div class="flex flex-col xl:flex-row justify-between items-start xl:items-center mb-6 gap-5">
         <div>
             <h1 class="text-2xl font-bold text-white tracking-tight">Dashboard de Inventario Patrimonial</h1>
             <p class="text-gray-400 text-sm mt-1">Sincronización y consolidación de activos del censo</p>
         </div>
         
         <div class="flex flex-wrap items-center gap-3 bg-[#1e2330] p-2 rounded-xl border border-gray-800 shadow-sm">
-            
-            <!-- Selector de Período -->
             <form method="GET" action="{{ route('admin.dashboard') }}" class="m-0 flex items-center">
-                <!-- ... tus inputs hidden ... -->
+                @if(request('buscar')) <input type="hidden" name="buscar" value="{{ request('buscar') }}"> @endif
+                @if(request('ubicacion')) <input type="hidden" name="ubicacion" value="{{ request('ubicacion') }}"> @endif
+                @if(request('estado')) <input type="hidden" name="estado" value="{{ request('estado') }}"> @endif
+                @if(request('alerta')) <input type="hidden" name="alerta" value="{{ request('alerta') }}"> @endif
+
                 <select name="periodo" class="bg-[#12141c] border border-gray-700 text-white rounded-lg p-2 text-sm focus:ring-2 focus:ring-blue-500 outline-none transition cursor-pointer" onchange="this.form.submit()">
                     @foreach($periodos as $per)
                         <option value="{{ $per->per_id }}" {{ $periodoSeleccionado == $per->per_id ? 'selected' : '' }}>
@@ -31,7 +39,6 @@
             @endphp
 
             @if($periodoActual && $periodoActual->per_cerrado == 0)
-                <!-- Botón Sincronizar -->
                 <form action="{{ route('admin.sincronizar') }}" method="POST" class="m-0">
                     @csrf
                     <button type="submit" class="bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold py-2 px-4 rounded-lg shadow-md transition flex items-center gap-2" onclick="return confirm('¿Descargar información más reciente desde Google Sheets?')">
@@ -39,7 +46,6 @@
                     </button>
                 </form>
 
-                <!-- Botón Aprobar Lote -->
                 <form action="{{ route('admin.aprobarLote') }}" method="POST" class="m-0">
                     @csrf
                     <button type="submit" class="bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-semibold py-2 px-4 rounded-lg shadow-md transition flex items-center gap-2" onclick="return confirm('¿Aprobar masivamente todos los registros pendientes?')">
@@ -49,7 +55,6 @@
 
                 <div class="w-px h-8 bg-gray-700 hidden sm:block"></div>
 
-                <!-- NUEVO: Botón Cerrar Período -->
                 <form action="{{ route('admin.cerrarPeriodo', $periodoActual->per_id) }}" method="POST" class="m-0">
                     @csrf
                     <button type="submit" class="bg-red-600 hover:bg-red-700 text-white text-sm font-semibold py-2 px-4 rounded-lg shadow-md transition flex items-center gap-2" onclick="return confirm('¿Estás seguro de CERRAR el período {{ $periodoActual->per_anio }}? Esta acción fijará la fecha de cierre hoy y marcará el padrón histórico como definitivo.')">
@@ -57,7 +62,6 @@
                     </button>
                 </form>
             @else
-                <!-- Indicador de período cerrado -->
                 <span class="bg-gray-800 text-gray-400 border border-gray-700 text-sm font-semibold py-2 px-4 rounded-lg flex items-center gap-2 cursor-not-allowed">
                     🔒 Período Histórico Cerrado el {{ $periodoActual->per_fecha_cierre ?? 'N/A' }}
                 </span>
@@ -65,179 +69,223 @@
         </div>
     </div>
 
-    <!-- KPIs -->
-    <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-6 mb-8">
-        <div class="bg-[#1e2330] border border-gray-800 border-l-4 border-l-blue-500 rounded-xl p-5 shadow-sm">
-            <div class="text-xs font-bold text-blue-400 uppercase tracking-wider mb-1">Total Activos (Maestro)</div>
-            <div class="text-3xl font-black text-white">{{ $totalActivos }}</div>
-        </div>
-        <div class="bg-[#1e2330] border border-gray-800 border-l-4 border-l-emerald-500 rounded-xl p-5 shadow-sm">
-            <div class="text-xs font-bold text-emerald-400 uppercase tracking-wider mb-1">Censados / Verificados</div>
-            <div class="text-3xl font-black text-white mb-2">{{ $verificados }}</div>
-            <div class="w-full bg-[#12141c] rounded-full h-1.5 border border-gray-700">
-                <div class="bg-emerald-500 h-1.5 rounded-full" style="width: {{ $porcentajeAvance }}%"></div>
-            </div>
-            <div class="text-xs text-gray-400 mt-1.5 font-medium">{{ $porcentajeAvance }}% de Avance</div>
-        </div>
-        <div class="bg-[#1e2330] border border-gray-800 border-l-4 border-l-amber-500 rounded-xl p-5 shadow-sm">
-            <div class="text-xs font-bold text-amber-400 uppercase tracking-wider mb-1">Pendientes (Staging)</div>
-            <div class="text-3xl font-black text-white">{{ $pendientes }}</div>
-        </div>
-        <div class="bg-[#1e2330] border border-gray-800 border-l-4 border-l-red-500 rounded-xl p-5 shadow-sm">
-            <div class="text-xs font-bold text-red-400 uppercase tracking-wider mb-1">Alertas (Reubicados)</div>
-            <div class="text-3xl font-black text-white">{{ $alertasMovimiento }}</div>
-        </div>
+    <!-- BOTONES DE PESTAÑAS (RESUMEN / TRAZABILIDAD) -->
+    <div class="flex space-x-6 border-b border-gray-800 pb-3 mb-6">
+        <button type="button" id="btn-resumen" onclick="cambiarPestana('resumen')" class="border-b-2 border-white font-semibold text-white pb-1 transition focus:outline-none cursor-pointer">
+            Resumen
+        </button>
+        <button type="button" id="btn-trazabilidad" onclick="cambiarPestana('trazabilidad')" class="text-gray-400 hover:text-gray-200 pb-1 transition focus:outline-none cursor-pointer">
+            Trazabilidad
+        </button>
     </div>
 
-    <!-- GRÁFICOS -->
-    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
-        <div class="bg-[#1e2330] border border-gray-800 rounded-xl p-5 shadow-sm lg:col-span-2">
-            <h3 class="text-white font-bold mb-4">Estado del Censo por Ubicación (Top 10)</h3>
-            <div class="relative h-64 w-full">
-                <canvas id="chartUbicaciones"></canvas>
-            </div>
-        </div>
-        <div class="bg-[#1e2330] border border-gray-800 rounded-xl p-5 shadow-sm">
-            <h3 class="text-white font-bold mb-4">Condición Física</h3>
-            <div class="relative h-64 w-full">
-                <canvas id="chartEstados"></canvas>
-            </div>
-        </div>
-    </div>
-
-    <!-- FILTROS DE TABLA -->
-    <div class="bg-[#1e2330] border border-gray-800 rounded-t-xl p-5 shadow-sm">
-        <form method="GET" action="{{ route('admin.dashboard') }}" class="grid grid-cols-1 md:grid-cols-5 gap-4 items-end m-0">
-            <input type="hidden" name="periodo" value="{{ $periodoSeleccionado }}">
-            
-            <div>
-                <label class="block text-xs font-semibold text-gray-400 mb-1.5 uppercase tracking-wider">Buscar Activo</label>
-                <input type="text" name="buscar" value="{{ request('buscar') }}" placeholder="Código, denominación..." class="bg-[#12141c] border border-gray-700 text-white rounded-lg p-2.5 w-full text-sm focus:ring-2 focus:ring-blue-500 outline-none transition">
-            </div>
-            <div>
-                <label class="block text-xs font-semibold text-gray-400 mb-1.5 uppercase tracking-wider">Ubicación</label>
-                <select name="ubicacion" class="bg-[#12141c] border border-gray-700 text-white rounded-lg p-2.5 w-full text-sm focus:ring-2 focus:ring-blue-500 outline-none transition">
-                    <option value="">Todas las ubicaciones</option>
-                    @foreach($ubicaciones as $ubi)
-                        <option value="{{ $ubi->ubi_codigo }}" {{ request('ubicacion') == $ubi->ubi_codigo ? 'selected' : '' }}>
-                            {{ $ubi->ubi_nombre }}
-                        </option>
-                    @endforeach
-                </select>
-            </div>
-            
-            <div>
-                <label class="block text-xs font-semibold text-gray-400 mb-1.5 uppercase tracking-wider">Estado Físico</label>
-                <select name="estado" class="bg-[#12141c] border border-gray-700 text-white rounded-lg p-2.5 w-full text-sm focus:ring-2 focus:ring-blue-500 outline-none transition">
-                    <option value="">Todos los estados</option>
-                    @foreach($estados as $est)
-                        <option value="{{ $est->est_nombre }}" {{ request('estado') == $est->est_nombre ? 'selected' : '' }}>
-                            {{ $est->est_nombre }}
-                        </option>
-                    @endforeach
-                </select>
-            </div>
-
-            <div>
-                <label class="block text-xs font-semibold text-gray-400 mb-1.5 uppercase tracking-wider">Alerta de Movimiento</label>
-                <select name="alerta" class="bg-[#12141c] border border-gray-700 text-white rounded-lg p-2.5 w-full text-sm focus:ring-2 focus:ring-blue-500 outline-none transition">
-                    <option value="">Todas</option>
-                    <option value="SIN VARIACIÓN" {{ request('alerta') == 'SIN VARIACIÓN' ? 'selected' : '' }}>Sin Variación</option>
-                    <option value="REUBICADO" {{ request('alerta') == 'REUBICADO' ? 'selected' : '' }}>Reubicado</option>
-                    <option value="ALTA NUEVA" {{ request('alerta') == 'ALTA NUEVA' ? 'selected' : '' }}>Alta Nueva</option>
-                </select>
-            </div>
-            <div class="flex gap-2 h-[42px]">
-                <button type="submit" class="bg-gray-700 hover:bg-gray-600 text-white px-4 py-2 rounded-lg w-full text-sm font-semibold transition shadow-sm">
-                    🔍 Filtrar
-                </button>
-                <a href="{{ route('admin.dashboard') }}" class="bg-transparent border border-gray-600 hover:bg-[#12141c] text-gray-300 px-4 py-2 rounded-lg w-full text-sm font-semibold transition flex items-center justify-center text-center">
-                    Limpiar
-                </a>
-            </div>
-        </form>
-    </div>
-
-    <!-- TABLA DE DATOS -->
-    <div class="bg-[#1e2330] border-x border-b border-gray-800 rounded-b-xl shadow-sm overflow-hidden mb-8">
-        <div class="overflow-x-auto p-1">
-            <table class="w-full text-left text-sm text-gray-300 whitespace-nowrap mt-2">
-                <thead class="bg-[#12141c] text-gray-400 border-y border-gray-800">
-                    <tr>
-                        <th class="px-5 py-3 font-semibold uppercase tracking-wider text-xs">Código</th>
-                        <th class="px-5 py-3 font-semibold uppercase tracking-wider text-xs">Denominación</th>
-                        <th class="px-5 py-3 font-semibold uppercase tracking-wider text-xs">Marca / Mod</th>
-                        <th class="px-5 py-3 font-semibold uppercase tracking-wider text-xs">Tipo / Color</th>
-                        <th class="px-5 py-3 font-semibold uppercase tracking-wider text-xs">Ubic. Actual</th>
-                        <th class="px-5 py-3 font-semibold uppercase tracking-wider text-xs">Estado</th>
-                        <th class="px-5 py-3 font-semibold uppercase tracking-wider text-xs">Constatado</th>
-                        <th class="px-5 py-3 font-semibold uppercase tracking-wider text-xs text-center">Acciones</th>
-                    </tr>
-                </thead>
-                <tbody class="divide-y divide-gray-800/80">
-                    @forelse($registrosVista as $reg)
-                    <tr class="hover:bg-[#2a3040] transition duration-150">
-                        <td class="px-5 py-4 font-bold text-white">{{ $reg->codigo_patrimonial }}</td>
-                        <td class="px-5 py-4">
-                            <span class="block text-white">{{ $reg->denominacion }}</span>
-                            @if($reg->alerta_movimiento == 'REUBICADO')
-                                <span class="text-[10px] text-red-400 uppercase font-bold tracking-wider">⚠ Reubicado</span>
-                            @elseif($reg->alerta_movimiento == 'ALTA NUEVA')
-                                <span class="text-[10px] text-blue-400 uppercase font-bold tracking-wider">✦ Nuevo</span>
-                            @endif
-                        </td>
-                        <td class="px-5 py-4 text-xs">
-                            <span class="block text-gray-400">Mrc: <span class="text-gray-200">{{ $reg->marca ?: '-' }}</span></span>
-                            <span class="block text-gray-400">Mod: <span class="text-gray-200">{{ $reg->modelo ?: '-' }}</span></span>
-                        </td>
-                        <td class="px-5 py-4 text-xs">
-                            <span class="block text-gray-400">Tipo: <span class="text-gray-200">{{ $reg->tipo ?: '-' }}</span></span>
-                            <span class="block text-gray-400">Col: <span class="text-gray-200">{{ $reg->color ?: '-' }}</span></span>
-                        </td>
-                        <td class="px-5 py-4 truncate max-w-[150px]" title="{{ $reg->ubicacion }}">{{ $reg->ubicacion }}</td>
-                        <td class="px-5 py-4">{{ $reg->estado }}</td>
-                        <td class="px-5 py-4">
-                            @if($reg->constatado_actual == 'CENSADO')
-                                <span class="bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 px-2.5 py-1 rounded-md text-xs font-semibold">Censado</span>
-                            @else
-                                <span class="bg-gray-800 text-gray-300 border border-gray-700 px-2.5 py-1 rounded-md text-xs font-semibold">No Localizado</span>
-                            @endif
-                        </td>
-                        <!-- Botón de Edición que activa el Modal Dinámico -->
-                        <td class="px-5 py-4 text-center">
-                            <div class="flex items-center justify-center gap-2">
-                                <button type="button" 
-                                    onclick="abrirModalEdicion('{{ $reg->codigo_patrimonial }}', '{{ addslashes($reg->denominacion) }}', '{{ addslashes($reg->marca) }}', '{{ addslashes($reg->modelo) }}', '{{ addslashes($reg->tipo) }}', '{{ addslashes($reg->color) }}', '{{ addslashes($reg->dimensiones) }}', '{{ addslashes($reg->estado) }}', '{{ addslashes($reg->ubicacion) }}')"
-                                    class="bg-blue-500/10 text-blue-400 hover:bg-blue-500 hover:text-white border border-blue-500/20 px-3 py-1.5 rounded-lg text-xs font-semibold transition flex items-center gap-1.5" title="Editar registro">
-                                    ✏️ Editar
-                                </button>
-                            </div>
-                        </td>
-                    </tr>
-                    @empty
-                    <tr>
-                        <td colspan="8" class="px-5 py-10 text-center text-gray-500">
-                            No se encontraron registros para los filtros aplicados.
-                        </td>
-                    </tr>
-                    @endforelse
-                </tbody>
-            </table>
-        </div>
+    <!-- PESTAÑA 1: RESUMEN (Solo KPIs y Gráficos)         -->
+    <div id="contenido-resumen" class="space-y-8" style="display: block;">
         
-        @if($registrosVista->hasPages())
-        <div class="px-5 py-4 border-t border-gray-800 bg-[#161922]">
-            {{ $registrosVista->links('pagination::tailwind') }}
+        <!-- KPIs de Resumen (Diseño limpio sin fondo de tarjeta) -->
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-6 pt-2 px-2">
+            <!-- Cobertura de verificación -->
+            <div>
+                <p class="text-[15px] font-semibold text-gray-300">Cobertura de verificación</p>
+                <h3 class="text-4xl font-bold text-white mt-1">{{ $porcentajeAvance }}%</h3>
+                <p class="text-sm text-gray-500 mt-1">{{ $verificados }} de {{ $totalActivos }} activos</p>
+            </div>
+            
+            <!-- Pendientes -->
+            <div>
+                <p class="text-[15px] font-semibold text-gray-300">Pendientes</p>
+                <h3 class="text-4xl font-bold text-white mt-1">{{ $pendientes }}</h3>
+                <p class="text-sm text-gray-500 mt-1">{{ 100 - $porcentajeAvance }}% restante</p>
+            </div>
+            
+            <!-- Deterioro interanual -->
+            <div>
+                <p class="text-[15px] font-semibold text-gray-300">Deterioro interanual</p>
+                <h3 class="text-4xl font-bold text-white mt-1">{{ $deterioro ?? '6' }}%</h3>
+                <p class="text-sm text-gray-500 mt-1">bajaron de estado</p>
+            </div>
         </div>
-        @endif
+
+        <!-- GRÁFICOS DE RESUMEN -->
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <!-- Gráfico: Avance por ubicación -->
+            <div class="bg-transparent border border-gray-800 rounded-xl p-5 shadow-sm lg:row-span-2 flex flex-col">
+                <h3 class="text-white font-bold mb-6 text-lg tracking-wide">Avance por ubicación</h3>
+                <!-- Altura incrementada a 600px para que las barras respiren -->
+                <div class="relative h-[600px] w-full flex-1">
+                    <canvas id="chartUbicaciones"></canvas>
+                </div>
+            </div>
+
+            <div class="flex flex-col gap-6">
+            
+                <div class="bg-transparent border border-gray-800 rounded-xl p-5 shadow-sm">
+                    <h3 class="text-white font-bold mb-6 text-lg tracking-wide">Activos por estado</h3>
+                    <!-- Altura incrementada a h-72 (288px) -->
+                    <div class="relative h-72 w-full">
+                        <canvas id="chartEstados"></canvas>
+                    </div>
+                </div>
+
+                <!-- Gráfico Inferior: NUEVO (Ejemplo: Activos por Tipo o Clasificación) -->
+                <div class="bg-transparent border border-gray-800 rounded-xl p-5 shadow-sm">
+                    <h3 class="text-white font-bold mb-6 text-lg tracking-wide">Distribución por Tipo de Activo</h3>
+                    <div class="relative h-72 w-full">
+                        <canvas id="chartTipos"></canvas>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- PESTAÑA 2: TRAZABILIDAD (KPIs de Alertas + Tabla) -->
+    <div id="contenido-trazabilidad" class="space-y-6" style="display: none;">
+        
+        <!-- KPIs exclusivos de Trazabilidad -->
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div class="bg-red-950/40 border border-red-900/50 p-5 rounded-xl shadow-lg">
+                <p class="text-sm text-red-400">Activos no encontrados / incidencias</p>
+                <h3 class="text-3xl font-bold text-red-200 mt-1">{{ $alertasMovimiento ?? 0 }}</h3>
+                <p class="text-xs text-red-400/80 mt-1">crítico — requiere atención en bitácora</p>
+            </div>
+            <div class="bg-amber-950/40 border border-amber-900/50 p-5 rounded-xl shadow-lg">
+                <p class="text-sm text-amber-400">Alertas de movimiento sin resolver</p>
+                <h3 class="text-3xl font-bold text-amber-200 mt-1">{{ $pendientes ?? 0 }}</h3>
+                <p class="text-xs text-amber-400/80 mt-1">registradas en el periodo actual</p>
+            </div>
+        </div>
+
+        <!-- FILTROS DE LA TABLA -->
+        <div class="bg-[#1e2330] border border-gray-800 rounded-t-xl p-5 shadow-sm mt-4">
+            <form method="GET" action="{{ route('admin.dashboard') }}" class="grid grid-cols-1 md:grid-cols-5 gap-4 items-end m-0">
+                <input type="hidden" name="periodo" value="{{ $periodoSeleccionado }}">
+                
+                <div>
+                    <label class="block text-xs font-semibold text-gray-400 mb-1.5 uppercase tracking-wider">Buscar Activo</label>
+                    <input type="text" name="buscar" value="{{ request('buscar') }}" placeholder="Código, denominación..." class="bg-[#12141c] border border-gray-700 text-white rounded-lg p-2.5 w-full text-sm focus:ring-2 focus:ring-blue-500 outline-none transition">
+                </div>
+                <div>
+                    <label class="block text-xs font-semibold text-gray-400 mb-1.5 uppercase tracking-wider">Ubicación</label>
+                    <select name="ubicacion" class="bg-[#12141c] border border-gray-700 text-white rounded-lg p-2.5 w-full text-sm focus:ring-2 focus:ring-blue-500 outline-none transition">
+                        <option value="">Todas las ubicaciones</option>
+                        @foreach($ubicaciones as $ubi)
+                            <option value="{{ $ubi->ubi_nombre }}" {{ request('ubicacion') == $ubi->ubi_nombre ? 'selected' : '' }}>
+                                {{ $ubi->ubi_nombre }}
+                            </option>
+                        @endforeach
+                    </select>
+                </div>
+                
+                <div>
+                    <label class="block text-xs font-semibold text-gray-400 mb-1.5 uppercase tracking-wider">Estado Físico</label>
+                    <select name="estado" class="bg-[#12141c] border border-gray-700 text-white rounded-lg p-2.5 w-full text-sm focus:ring-2 focus:ring-blue-500 outline-none transition">
+                        <option value="">Todos los estados</option>
+                        @foreach($estados as $est)
+                            <option value="{{ $est->est_nombre }}" {{ request('estado') == $est->est_nombre ? 'selected' : '' }}>
+                                {{ $est->est_nombre }}
+                            </option>
+                        @endforeach
+                    </select>
+                </div>
+
+                <div>
+                    <label class="block text-xs font-semibold text-gray-400 mb-1.5 uppercase tracking-wider">Alerta de Movimiento</label>
+                    <select name="alerta" class="bg-[#12141c] border border-gray-700 text-white rounded-lg p-2.5 w-full text-sm focus:ring-2 focus:ring-blue-500 outline-none transition">
+                        <option value="">Todas</option>
+                        <option value="SIN VARIACIÓN" {{ request('alerta') == 'SIN VARIACIÓN' ? 'selected' : '' }}>Sin Variación</option>
+                        <option value="REUBICADO" {{ request('alerta') == 'REUBICADO' ? 'selected' : '' }}>Reubicado</option>
+                        <option value="ALTA NUEVA" {{ request('alerta') == 'ALTA NUEVA' ? 'selected' : '' }}>Alta Nueva</option>
+                    </select>
+                </div>
+                <div class="flex gap-2 h-[42px]">
+                    <button type="submit" class="bg-gray-700 hover:bg-gray-600 text-white px-4 py-2 rounded-lg w-full text-sm font-semibold transition shadow-sm">
+                        🔍 Filtrar
+                    </button>
+                    <a href="{{ route('admin.dashboard', ['periodo' => $periodoSeleccionado]) }}" class="bg-transparent border border-gray-600 hover:bg-[#12141c] text-gray-300 px-4 py-2 rounded-lg w-full text-sm font-semibold transition flex items-center justify-center text-center">
+                        Limpiar
+                    </a>
+                </div>
+            </form>
+        </div>
+
+        <!-- TABLA DE DATOS PRINCIPAL (Mantenida intacta) -->
+        <div class="bg-[#1e2330] border-x border-b border-gray-800 rounded-b-xl shadow-sm overflow-hidden">
+            <div class="overflow-x-auto p-1">
+                <table class="w-full text-left text-sm text-gray-300 whitespace-nowrap mt-2">
+                    <thead class="bg-[#12141c] text-gray-400 border-y border-gray-800">
+                        <tr>
+                            <th class="px-5 py-3 font-semibold uppercase tracking-wider text-xs">Código</th>
+                            <th class="px-5 py-3 font-semibold uppercase tracking-wider text-xs">Denominación</th>
+                            <th class="px-5 py-3 font-semibold uppercase tracking-wider text-xs">Marca / Mod</th>
+                            <th class="px-5 py-3 font-semibold uppercase tracking-wider text-xs">Tipo / Color</th>
+                            <th class="px-5 py-3 font-semibold uppercase tracking-wider text-xs">Ubic. Actual</th>
+                            <th class="px-5 py-3 font-semibold uppercase tracking-wider text-xs">Estado</th>
+                            <th class="px-5 py-3 font-semibold uppercase tracking-wider text-xs">Constatado</th>
+                            <th class="px-5 py-3 font-semibold uppercase tracking-wider text-xs text-center">Acciones</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-gray-800/80">
+                        @forelse($registrosVista as $reg)
+                        <tr class="hover:bg-[#2a3040] transition duration-150">
+                            <td class="px-5 py-4 font-bold text-white">{{ $reg->codigo_patrimonial }}</td>
+                            <td class="px-5 py-4">
+                                <span class="block text-white">{{ $reg->denominacion }}</span>
+                                @if($reg->alerta_movimiento == 'REUBICADO')
+                                    <span class="text-[10px] text-red-400 uppercase font-bold tracking-wider">⚠ Reubicado</span>
+                                @elseif($reg->alerta_movimiento == 'ALTA NUEVA')
+                                    <span class="text-[10px] text-blue-400 uppercase font-bold tracking-wider">✦ Nuevo</span>
+                                @endif
+                            </td>
+                            <td class="px-5 py-4 text-xs">
+                                <span class="block text-gray-400">Mrc: <span class="text-gray-200">{{ $reg->marca ?: '-' }}</span></span>
+                                <span class="block text-gray-400">Mod: <span class="text-gray-200">{{ $reg->modelo ?: '-' }}</span></span>
+                            </td>
+                            <td class="px-5 py-4 text-xs">
+                                <span class="block text-gray-400">Tipo: <span class="text-gray-200">{{ $reg->tipo ?: '-' }}</span></span>
+                                <span class="block text-gray-400">Col: <span class="text-gray-200">{{ $reg->color ?: '-' }}</span></span>
+                            </td>
+                            <td class="px-5 py-4 truncate max-w-[150px]" title="{{ $reg->ubicacion }}">{{ $reg->ubicacion }}</td>
+                            <td class="px-5 py-4">{{ $reg->estado }}</td>
+                            <td class="px-5 py-4">
+                                @if($reg->constatado_actual == 'CENSADO')
+                                    <span class="bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 px-2.5 py-1 rounded-md text-xs font-semibold">Censado</span>
+                                @else
+                                    <span class="bg-gray-800 text-gray-300 border border-gray-700 px-2.5 py-1 rounded-md text-xs font-semibold">No Localizado</span>
+                                @endif
+                            </td>
+                            <td class="px-5 py-4 text-center">
+                                <div class="flex items-center justify-center gap-2">
+                                    <button type="button" 
+                                        onclick="abrirModalEdicion('{{ $reg->codigo_patrimonial }}', '{{ addslashes($reg->denominacion) }}', '{{ addslashes($reg->marca) }}', '{{ addslashes($reg->modelo) }}', '{{ addslashes($reg->tipo) }}', '{{ addslashes($reg->color) }}', '{{ addslashes($reg->dimensiones) }}', '{{ addslashes($reg->estado) }}', '{{ addslashes($reg->ubicacion) }}')"
+                                        class="bg-blue-500/10 text-blue-400 hover:bg-blue-500 hover:text-white border border-blue-500/20 px-3 py-1.5 rounded-lg text-xs font-semibold transition flex items-center gap-1.5" title="Editar registro">
+                                        ✏️ Editar
+                                    </button>
+                                </div>
+                            </td>
+                        </tr>
+                        @empty
+                        <tr>
+                            <td colspan="8" class="px-5 py-10 text-center text-gray-500">
+                                No se encontraron registros para los filtros aplicados.
+                            </td>
+                        </tr>
+                        @endforelse
+                    </tbody>
+                </table>
+            </div>
+            
+            @if($registrosVista->hasPages())
+            <div class="px-5 py-4 border-t border-gray-800 bg-[#161922]">
+                {{ $registrosVista->links('pagination::tailwind') }}
+            </div>
+            @endif
+        </div>
     </div>
 </div>
 
 <!-- ================= MODAL FLOTANTE DE EDICIÓN ================= -->
 <div id="modalEditar" class="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center hidden p-4">
     <div class="bg-[#161922] border border-gray-800 rounded-2xl w-full max-w-2xl shadow-2xl overflow-hidden transform transition-all">
-        
-        <!-- Cabecera del Modal -->
         <div class="px-6 py-4 border-b border-gray-800 flex justify-between items-center bg-[#1e2330]">
             <h3 class="text-lg font-bold text-white flex items-center gap-2">
                 ✏️ Editar Activo Patrimonial
@@ -245,12 +293,10 @@
             <button type="button" onclick="cerrarModalEdicion()" class="text-gray-400 hover:text-white text-xl font-bold">&times;</button>
         </div>
 
-        <!-- Formulario apuntando a la ruta PUT con directiva @method('PUT') -->
         <form id="formEditarActivo" method="POST" class="p-6 space-y-4">
             @csrf
             @method('PUT')
             
-            <!-- Fila 1: Campos de Texto -->
             <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
                 <div>
                     <label class="block text-xs font-semibold text-gray-400 mb-1 uppercase">Código Patrimonial</label>
@@ -266,9 +312,7 @@
                 </div>
             </div>
 
-            <!-- Fila 2: Selectores Desplegables -->
             <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <!-- CAMPO: MARCA -->
                 <div>
                     <label class="block text-xs font-semibold text-gray-400 mb-1 uppercase">Marca</label>
                     <select name="mar_id" id="edit_mar_id" class="bg-[#12141c] border border-gray-700 text-white rounded-lg p-2.5 w-full text-sm focus:ring-2 focus:ring-blue-500 outline-none appearance-none">
@@ -279,7 +323,6 @@
                     </select>
                 </div>
 
-                <!-- CAMPO: MODELO -->
                 <div>
                     <label class="block text-xs font-semibold text-gray-400 mb-1 uppercase">Modelo</label>
                     <select name="mod_id" id="edit_mod_id" class="bg-[#12141c] border border-gray-700 text-white rounded-lg p-2.5 w-full text-sm focus:ring-2 focus:ring-blue-500 outline-none appearance-none">
@@ -290,7 +333,6 @@
                     </select>
                 </div>
 
-                <!-- CAMPO: TIPO (Clasificador) -->
                 <div>
                     <label class="block text-xs font-semibold text-gray-400 mb-1 uppercase">Tipo</label>
                     <select name="cla_id" id="edit_cla_id" class="bg-[#12141c] border border-gray-700 text-white rounded-lg p-2.5 w-full text-sm focus:ring-2 focus:ring-blue-500 outline-none appearance-none">
@@ -301,7 +343,6 @@
                     </select>
                 </div>
 
-                <!-- CAMPO: COLOR -->
                 <div>
                     <label class="block text-xs font-semibold text-gray-400 mb-1 uppercase">Color</label>
                     <select name="col_id" id="edit_col_id" class="bg-[#12141c] border border-gray-700 text-white rounded-lg p-2.5 w-full text-sm focus:ring-2 focus:ring-blue-500 outline-none appearance-none">
@@ -312,7 +353,6 @@
                     </select>
                 </div>
 
-                <!-- CAMPO: ESTADO FÍSICO -->
                 <div>
                     <label class="block text-xs font-semibold text-gray-400 mb-1 uppercase">Estado Físico</label>
                     <select name="est_id" id="edit_est_id" class="bg-[#12141c] border border-gray-700 text-white rounded-lg p-2.5 w-full text-sm focus:ring-2 focus:ring-blue-500 outline-none appearance-none">
@@ -323,7 +363,6 @@
                     </select>
                 </div>
 
-                <!-- CAMPO: UBICACIÓN -->
                 <div>
                     <label class="block text-xs font-semibold text-gray-400 mb-1 uppercase">Ubicación Registrada</label>
                     <select name="ubi_id" id="edit_ubi_id" class="bg-[#12141c] border border-gray-700 text-white rounded-lg p-2.5 w-full text-sm focus:ring-2 focus:ring-blue-500 outline-none appearance-none">
@@ -334,9 +373,8 @@
                     </select>
                 </div>
 
-                <div class="flex items-center justify-start space-x-3 mt-6 pt-4 border-t border-gray-700">
-                    <button type="submit" 
-                            class="px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-lg text-sm font-medium shadow-lg transition">
+                <div class="flex items-center justify-start space-x-3 mt-6 pt-4 border-t border-gray-700 col-span-2">
+                    <button type="submit" class="px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-lg text-sm font-medium shadow-lg transition">
                         Guardar Cambios
                     </button>
                 </div>
@@ -345,19 +383,48 @@
     </div>
 </div>
 
-<!-- Script del Modal y Gráficos -->
+<!-- Scripts de Gráficos y Modales -->
 <script>
+    function cambiarPestana(pestana) {
+        const contResumen = document.getElementById('contenido-resumen');
+        const contTrazabilidad = document.getElementById('contenido-trazabilidad');
+        const btnResumen = document.getElementById('btn-resumen');
+        const btnTrazabilidad = document.getElementById('btn-trazabilidad');
+
+        const claseActiva = ['border-b-2', 'border-white', 'font-semibold', 'text-white'];
+        const claseInactiva = ['text-gray-400', 'hover:text-gray-200'];
+
+        if (pestana === 'resumen') {
+            contResumen.style.display = 'block';
+            contTrazabilidad.style.display = 'none';
+            
+            btnResumen.classList.add(...claseActiva);
+            btnResumen.classList.remove(...claseInactiva);
+            btnTrazabilidad.classList.remove(...claseActiva);
+            btnTrazabilidad.classList.add(...claseInactiva);
+
+            localStorage.setItem('dashboardTab', 'resumen');
+        } else {
+            contResumen.style.display = 'none';
+            contTrazabilidad.style.display = 'block';
+            
+            btnTrazabilidad.classList.add(...claseActiva);
+            btnTrazabilidad.classList.remove(...claseInactiva);
+            btnResumen.classList.remove(...claseActiva);
+            btnResumen.classList.add(...claseInactiva);
+
+            localStorage.setItem('dashboardTab', 'trazabilidad');
+        }
+    }
+
     function abrirModalEdicion(codigo, denominacion, marca, modelo, tipo, color, dimensiones, estado, ubicacion) {
-        // Asignar dinámicamente la ruta PUT con el código correspondiente
         const urlUpdate = "{{ route('admin.activos.update', ':codigo') }}".replace(':codigo', codigo);
         document.getElementById('formEditarActivo').action = urlUpdate;
 
-        // Rellenar campos simples de texto
         document.getElementById('edit_codigo').value = codigo;
         document.getElementById('edit_denominacion').value = denominacion;
         document.getElementById('edit_dimensiones').value = dimensiones;
         
-        // Función auxiliar: Busca la opción en el select basándose en el texto y la selecciona
         function seleccionarPorTexto(selectId, texto) {
             const select = document.getElementById(selectId);
             if (!select || !texto) return;
@@ -369,7 +436,6 @@
             }
         }
 
-        // Llenar los menús desplegables buscando sus textos correctos
         seleccionarPorTexto('edit_mar_id', marca);
         seleccionarPorTexto('edit_mod_id', modelo);
         seleccionarPorTexto('edit_cla_id', tipo);
@@ -377,7 +443,6 @@
         seleccionarPorTexto('edit_est_id', estado);
         seleccionarPorTexto('edit_ubi_id', ubicacion);
 
-        // Mostrar modal
         document.getElementById('modalEditar').classList.remove('hidden');
     }
 
@@ -386,43 +451,71 @@
     }
 
     document.addEventListener('DOMContentLoaded', function() {
+        // =========================================================
+        // 1. AUTO-DETECCIÓN DE PESTAÑAS Y FILTROS
+        // =========================================================
+        const urlParams = new URLSearchParams(window.location.search);
+        const hayFiltros = urlParams.has('buscar') || 
+                           urlParams.has('ubicacion') || 
+                           urlParams.has('estado') || 
+                           urlParams.has('alerta') || 
+                           urlParams.has('page');
+        
+        let tabGuardada = localStorage.getItem('dashboardTab') || 'resumen';
+        
+        if (hayFiltros) {
+            tabGuardada = 'trazabilidad';
+        }
+        
+        cambiarPestana(tabGuardada);
+
+        // =========================================================
+        // 2. INICIALIZACIÓN DE GRÁFICOS (Chart.js)
+        // =========================================================
         Chart.defaults.color = '#9ca3af';
-        Chart.defaults.borderColor = '#1f2937';
+        Chart.defaults.borderColor = '#374151';
 
-        const ctxUbi = document.getElementById('chartUbicaciones').getContext('2d');
-        new Chart(ctxUbi, {
-            type: 'bar',
-            data: {
-                labels: {!! json_encode($chartUbiLabels) !!},
-                datasets: [
-                    {
-                        label: 'Verificados',
-                        backgroundColor: '#10b981', 
-                        data: {!! json_encode($chartUbiVerificados) !!}
-                    },
-                    {
-                        label: 'No Localizados',
-                        backgroundColor: '#374151', 
-                        data: {!! json_encode($chartUbiPendientes) !!}
-                    }
-                ]
-            },
-            options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'bottom' } } }
-        });
+        // Gráfico de Avance por Ubicación
+        const ctxUbi = document.getElementById('chartUbicaciones');
+        if (ctxUbi) {
+            new Chart(ctxUbi.getContext('2d'), {
+                type: 'bar',
+                data: {
+                    labels: {!! json_encode($chartUbiLabels ?? []) !!},
+                    datasets: [
+                        { label: 'Verificados', backgroundColor: '#2563eb', data: {!! json_encode($chartUbiVerificados ?? []) !!}, barPercentage: 0.6, categoryPercentage: 0.8 },
+                        { label: 'Pendientes', backgroundColor: '#4b5563', data: {!! json_encode($chartUbiPendientes ?? []) !!}, barPercentage: 0.6, categoryPercentage: 0.8 }
+                    ]
+                },
+                options: { indexAxis: 'y', responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { x: { stacked: true, grid: { color: '#1f2937' } }, y: { stacked: true, grid: { display: false } } } }
+            });
+        }
 
-        const ctxEst = document.getElementById('chartEstados').getContext('2d');
-        new Chart(ctxEst, {
-            type: 'doughnut',
-            data: {
-                labels: {!! json_encode($chartEstLabels) !!},
-                datasets: [{
-                    data: {!! json_encode($chartEstData) !!},
-                    backgroundColor: ['#10b981', '#ef4444', '#3b82f6', '#f59e0b', '#8b5cf6', '#6b7280'],
-                    borderWidth: 0
-                }]
-            },
-            options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'bottom' } }, cutout: '70%' }
-        });
+        // Gráfico de Activos por Estado
+        const ctxEst = document.getElementById('chartEstados');
+        if (ctxEst) {
+            new Chart(ctxEst.getContext('2d'), {
+                type: 'doughnut',
+                data: {
+                    labels: {!! json_encode($chartEstLabels ?? []) !!},
+                    datasets: [{ data: {!! json_encode($chartEstData ?? []) !!}, backgroundColor: ['#10b981', '#ef4444', '#3b82f6', '#f59e0b', '#8b5cf6', '#6b7280'], borderWidth: 0 }]
+                },
+                options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'bottom' } }, cutout: '70%' }
+            });
+        }
+
+        // Gráfico de Tipos de Activos
+        const ctxTipos = document.getElementById('chartTipos');
+        if (ctxTipos) {
+            new Chart(ctxTipos.getContext('2d'), {
+                type: 'bar',
+                data: {
+                    labels: {!! json_encode($chartTipoLabels ?? []) !!},
+                    datasets: [{ label: 'Cantidad', data: {!! json_encode($chartTipoData ?? []) !!}, backgroundColor: ['#8b5cf6', '#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#14b8a6', '#6366f1'], borderRadius: 4 }]
+                },
+                options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true, grid: { color: '#1f2937' }, ticks: { stepSize: 1 } }, x: { grid: { display: false }, ticks: { callback: function(val) { let lbl = this.getLabelForValue(val); return lbl.length > 15 ? lbl.substr(0, 15) + '...' : lbl; } } } } }
+            });
+        }
     });
 </script>
 @endsection
