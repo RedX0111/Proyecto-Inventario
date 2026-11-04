@@ -20,6 +20,10 @@ Route::middleware(['auth'])->group(function () {
         Route::post('/sincronizar-sheets', [AdminController::class, 'jalarDataDeSheets'])->name('admin.sincronizar');
         Route::post('/aprobar-lote', [AdminController::class, 'aprobarLote'])->name('admin.aprobarLote');
         Route::post('/dashboard/periodo/{id}/cerrar', [AdminController::class, 'cerrarPeriodo'])->name('admin.cerrarPeriodo');
+        Route::post('/admin/activos/store', [AdminController::class, 'activosStore'])->name('activos.store');
+        Route::get('/admin/catalogos', [App\Http\Controllers\AdminController::class, 'catalogosIndex'])->name('admin.catalogos');
+        Route::post('/admin/catalogos/store', [App\Http\Controllers\AdminController::class, 'catalogosStore'])->name('admin.catalogos.store');
+        Route::put('/admin/catalogos/update', [App\Http\Controllers\AdminController::class, 'catalogosUpdate'])->name('admin.catalogos.update');
         
         //Editar activos
         Route::put('/dashboard/activos/{codigo}', [AdminController::class, 'activosUpdate'])->name('admin.activos.update');

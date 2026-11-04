@@ -155,6 +155,13 @@
             </div>
         </div>
 
+        <!-- BOTÓN NUEVO ACTIVO -->
+        <div class="flex justify-end mt-2 mb-2">
+            <button type="button" onclick="abrirModalNuevo()" class="bg-emerald-600 hover:bg-emerald-500 text-white px-4 py-2 rounded-lg text-sm font-semibold transition flex items-center gap-2 shadow-md">
+                ➕ Nuevo Activo
+            </button>
+        </div>
+
         <!-- FILTROS DE LA TABLA -->
         <div class="bg-[#1e2330] border border-gray-800 rounded-t-xl p-5 shadow-sm mt-4">
             <form method="GET" action="{{ route('admin.dashboard') }}" class="grid grid-cols-1 md:grid-cols-5 gap-4 items-end m-0">
@@ -216,7 +223,7 @@
                         <tr>
                             <th class="px-5 py-3 font-semibold uppercase tracking-wider text-xs">Código</th>
                             <th class="px-5 py-3 font-semibold uppercase tracking-wider text-xs">Denominación</th>
-                            <th class="px-5 py-3 font-semibold uppercase tracking-wider text-xs">Marca / Mod</th>
+                            <th class="px-5 py-3 font-semibold uppercase tracking-wider text-xs">Marca / Serie</th>
                             <th class="px-5 py-3 font-semibold uppercase tracking-wider text-xs">Tipo / Color</th>
                             <th class="px-5 py-3 font-semibold uppercase tracking-wider text-xs">Ubic. Actual</th>
                             <th class="px-5 py-3 font-semibold uppercase tracking-wider text-xs">Estado</th>
@@ -238,7 +245,7 @@
                             </td>
                             <td class="px-5 py-4 text-xs">
                                 <span class="block text-gray-400">Mrc: <span class="text-gray-200">{{ $reg->marca ?: '-' }}</span></span>
-                                <span class="block text-gray-400">Mod: <span class="text-gray-200">{{ $reg->modelo ?: '-' }}</span></span>
+                                <span class="block text-gray-400">Serie: <span class="text-gray-200">{{ $reg->serie ?: '-' }}</span></span>
                             </td>
                             <td class="px-5 py-4 text-xs">
                                 <span class="block text-gray-400">Tipo: <span class="text-gray-200">{{ $reg->tipo ?: '-' }}</span></span>
@@ -517,5 +524,122 @@
             });
         }
     });
+
+    function abrirModalNuevo() {
+        document.getElementById('modalNuevo').classList.remove('hidden');
+    }
+
+    function cerrarModalNuevo() {
+        document.getElementById('modalNuevo').classList.add('hidden');
+    }
 </script>
+
+<!-- ================= MODAL FLOTANTE DE NUEVO ACTIVO ================= -->
+<div id="modalNuevo" class="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center hidden p-4">
+    <div class="bg-[#161922] border border-gray-800 rounded-2xl w-full max-w-2xl shadow-2xl overflow-hidden transform transition-all">
+        <div class="px-6 py-4 border-b border-gray-800 flex justify-between items-center bg-[#1e2330]">
+            <h3 class="text-lg font-bold text-white flex items-center gap-2">
+                ➕ Registrar Nuevo Activo
+            </h3>
+            <button type="button" onclick="cerrarModalNuevo()" class="text-gray-400 hover:text-white text-xl font-bold">&times;</button>
+        </div>
+
+        <form action="{{ route('activos.store') }}" method="POST" class="p-6 space-y-4">
+            @csrf
+            
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+                <div>
+                    <label class="block text-xs font-semibold text-gray-400 mb-1 uppercase">Código Patrimonial *</label>
+                    <input type="text" name="codigo_patrimonial" required placeholder="Ej. 7408..." class="bg-[#12141c] border border-gray-700 text-white rounded-lg p-2.5 w-full text-sm focus:ring-2 focus:ring-emerald-500 outline-none">
+                </div>
+                <div>
+                    <label class="block text-xs font-semibold text-gray-400 mb-1 uppercase">Denominación *</label>
+                    <input type="text" name="denominacion" required placeholder="Ej. SILLA FIJA" class="bg-[#12141c] border border-gray-700 text-white rounded-lg p-2.5 w-full text-sm focus:ring-2 focus:ring-emerald-500 outline-none">
+                </div>
+                <div>
+                    <label class="block text-xs font-semibold text-gray-400 mb-1 uppercase">Dimensiones</label>
+                    <input type="text" name="dimensiones" placeholder="Opcional" class="bg-[#12141c] border border-gray-700 text-white rounded-lg p-2.5 w-full text-sm focus:ring-2 focus:ring-emerald-500 outline-none">
+                </div>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                    <label class="block text-xs font-semibold text-gray-400 mb-1 uppercase">Serie</label>
+                    <input type="text" name="serie" placeholder="Opcional" class="bg-[#12141c] border border-gray-700 text-white rounded-lg p-2.5 w-full text-sm focus:ring-2 focus:ring-emerald-500 outline-none">
+                </div>
+
+                <div>
+                    <label class="block text-xs font-semibold text-gray-400 mb-1 uppercase">Marca</label>
+                    <select name="mar_id" class="bg-[#12141c] border border-gray-700 text-white rounded-lg p-2.5 w-full text-sm focus:ring-2 focus:ring-emerald-500 outline-none appearance-none">
+                        <option value="">Seleccionar Marca...</option>
+                        @foreach($marcas as $marca)
+                            <option value="{{ $marca->mar_id }}">{{ $marca->mar_nombre }}</option>
+                        @endforeach
+                    </select>
+                </div>
+
+                <div>
+                    <label class="block text-xs font-semibold text-gray-400 mb-1 uppercase">Modelo</label>
+                    <select name="mod_id" class="bg-[#12141c] border border-gray-700 text-white rounded-lg p-2.5 w-full text-sm focus:ring-2 focus:ring-emerald-500 outline-none appearance-none">
+                        <option value="">Seleccionar Modelo...</option>
+                        @foreach($modelos as $modelo)
+                            <option value="{{ $modelo->mod_id }}">{{ $modelo->mod_nombre }}</option>
+                        @endforeach
+                    </select>
+                </div>
+
+                <div>
+                    <label class="block text-xs font-semibold text-gray-400 mb-1 uppercase">Tipo / Clasificador</label>
+                    <select name="cla_id" class="bg-[#12141c] border border-gray-700 text-white rounded-lg p-2.5 w-full text-sm focus:ring-2 focus:ring-emerald-500 outline-none appearance-none">
+                        <option value="">Seleccionar Tipo...</option>
+                        @foreach($clasificadores as $clasificador)
+                            <option value="{{ $clasificador->cla_id }}">{{ $clasificador->cla_descripcion }}</option>
+                        @endforeach
+                    </select>
+                </div>
+
+                <div>
+                    <label class="block text-xs font-semibold text-gray-400 mb-1 uppercase">Color</label>
+                    <select name="col_id" class="bg-[#12141c] border border-gray-700 text-white rounded-lg p-2.5 w-full text-sm focus:ring-2 focus:ring-emerald-500 outline-none appearance-none">
+                        <option value="">Seleccionar Color...</option>
+                        @foreach($colores as $color)
+                            <option value="{{ $color->col_id }}">{{ $color->col_nombre }}</option>
+                        @endforeach
+                    </select>
+                </div>
+
+                <div>
+                    <label class="block text-xs font-semibold text-gray-400 mb-1 uppercase">Estado Físico</label>
+                    <select name="est_id" class="bg-[#12141c] border border-gray-700 text-white rounded-lg p-2.5 w-full text-sm focus:ring-2 focus:ring-emerald-500 outline-none appearance-none">
+                        <option value="">Seleccionar Estado...</option>
+                        @foreach($estados as $estado)
+                            <option value="{{ $estado->est_id }}">{{ $estado->est_nombre }}</option>
+                        @endforeach
+                    </select>
+                </div>
+
+                <div>
+                    <label class="block text-xs font-semibold text-gray-400 mb-1 uppercase">Ubicación Registrada</label>
+                    <select name="ubi_id" class="bg-[#12141c] border border-gray-700 text-white rounded-lg p-2.5 w-full text-sm focus:ring-2 focus:ring-emerald-500 outline-none appearance-none">
+                        <option value="">Seleccionar Ubicación...</option>
+                        @foreach($ubicaciones as $ubicacion)
+                            <option value="{{ $ubicacion->ubi_id }}">{{ $ubicacion->ubi_nombre }}</option>
+                        @endforeach
+                    </select>
+                </div>
+
+                <input type="hidden" name="es_temporal" value="1">
+
+                <div class="flex items-center justify-end space-x-3 mt-6 pt-4 border-t border-gray-700 col-span-2">
+                    <button type="button" onclick="cerrarModalNuevo()" class="px-4 py-2 bg-gray-700 hover:bg-gray-600 text-white rounded-lg text-sm font-medium transition">
+                        Cancelar
+                    </button>
+                    <button type="submit" class="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg text-sm font-medium shadow-lg transition">
+                        Guardar Activo
+                    </button>
+                </div>
+            </div>
+        </form>
+    </div>
+</div>
 @endsection

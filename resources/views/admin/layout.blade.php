@@ -73,6 +73,10 @@
                    class="flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-semibold transition {{ request()->routeIs('admin.usuarios.*') ? 'bg-blue-600 text-white shadow-lg' : 'text-gray-400 hover:bg-[#1e2330] hover:text-white' }}">
                     👥 Gestión de Usuarios
                 </a>
+                <a href="{{ route('admin.catalogos') }}"
+                    class="flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-semibold transition {{ request()->routeIs('admin.usuarios.*') ? 'bg-blue-600 text-white shadow-lg' : 'text-gray-400 hover:bg-[#1e2330] hover:text-white' }}">
+                    Catálogos
+                </a>
             </nav>
         </div>
 
