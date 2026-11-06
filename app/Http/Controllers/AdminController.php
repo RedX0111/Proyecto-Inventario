@@ -750,4 +750,86 @@ class AdminController extends Controller
             return back()->with('error', 'Error al guardar (Es posible que el nombre ya exista). Detalle: ' . $e->getMessage());
         }
     }
+
+    /**
+     * Muestra la interfaz de configuración de reportes.
+     */
+    public function reportesConfig(Request $request)
+    {
+        $periodos = DB::table('bd_periodos_fiscales')->orderBy('per_anio', 'desc')->get();
+        $ubicaciones = DB::table('bd_ubicaciones')->orderBy('ubi_nombre')->get();
+        $estados = DB::table('bd_estados_fisicos')->orderBy('est_nombre')->get();
+        $clasificadores = DB::table('sla_clasificadores')->orderBy('cla_descripcion')->get();
+
+        return view('admin.reportes_config', compact('periodos', 'ubicaciones', 'estados', 'clasificadores'));
+    }
+
+    /**
+     * Procesa los filtros y genera el reporte en Pantalla/Impresión o CSV/Excel.
+     */
+    public function reportesGenerar(Request $request)
+    {
+        $query = DB::table('v_bd_tabla_master');
+
+        // 1. Aplicar filtros dinámicos seleccionados por el usuario
+        if ($request->filled('periodo')) {
+            $anio = DB::table('bd_periodos_fiscales')->where('per_id', $request->input('periodo'))->value('per_anio');
+            $query->where('anio_auditoria', $anio);
+        }
+        if ($request->filled('ubicacion')) {
+            $query->where('ubicacion', $request->input('ubicacion'));
+        }
+        if ($request->filled('estado')) {
+            $query->where('estado', $request->input('estado'));
+        }
+        if ($request->filled('tipo')) {
+            $query->where('tipo', $request->input('tipo'));
+        }
+        if ($request->filled('constatado')) {
+            $query->where('constatado_actual', $request->input('constatado'));
+        }
+        if ($request->filled('alerta')) {
+            $query->where('alerta_movimiento', $request->input('alerta'));
+        }
+
+        $registros = $query->get();
+        $columnasSeleccionadas = $request->input('columnas', [
+            'codigo_patrimonial', 'denominacion', 'marca', 'serie', 'ubicacion', 'estado', 'constatado_actual'
+        ]);
+        $formato = $request->input('formato', 'pantalla'); // 'pantalla' para imprimir o 'excel' para CSV
+
+        // Si el usuario elige Excel / CSV
+        if ($formato === 'excel') {
+            $filename = "reporte_patrimonial_" . date('Y-m-d') . ".csv";
+            $headers = [
+                "Content-type"        => "text/csv; charset=UTF-8",
+                "Content-Disposition" => "attachment; filename=$filename",
+                "Pragma"              => "no-cache",
+                "Cache-Control"       => "must-revalidate, post-check=0, pre-check=0",
+                "Expires"             => "0"
+            ];
+
+            $callback = function() use ($registros, $columnasSeleccionadas) {
+                $file = fopen('php://output', 'w');
+                fprintf($file, chr(0xEF).chr(0xBB).chr(0xBF)); // Soporte tildes UTF-8 Excel
+                
+                // Cabeceras del CSV
+                fputcsv($file, array_map('ucfirst', $columnasSeleccionadas), ';');
+
+                foreach ($registros as $reg) {
+                    $fila = [];
+                    foreach ($columnasSeleccionadas as $col) {
+                        $fila[] = $reg->{$col} ?? '-';
+                    }
+                    fputcsv($file, $fila, ';');
+                }
+                fclose($file);
+            };
+
+            return response()->stream($callback, 200, $headers);
+        }
+
+        // Si el usuario elige Vista de Impresión / Pantalla
+        return view('admin.reportes_print', compact('registros', 'columnasSeleccionadas'));
+    }
 }

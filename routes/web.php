@@ -24,6 +24,8 @@ Route::middleware(['auth'])->group(function () {
         Route::get('/admin/catalogos', [App\Http\Controllers\AdminController::class, 'catalogosIndex'])->name('admin.catalogos');
         Route::post('/admin/catalogos/store', [App\Http\Controllers\AdminController::class, 'catalogosStore'])->name('admin.catalogos.store');
         Route::put('/admin/catalogos/update', [App\Http\Controllers\AdminController::class, 'catalogosUpdate'])->name('admin.catalogos.update');
+        Route::get('/admin/reportes/configurar', [App\Http\Controllers\AdminController::class, 'reportesConfig'])->name('admin.reportes.config');
+        Route::post('/admin/reportes/generar', [App\Http\Controllers\AdminController::class, 'reportesGenerar'])->name('admin.reportes.generar');
         
         //Editar activos
         Route::put('/dashboard/activos/{codigo}', [AdminController::class, 'activosUpdate'])->name('admin.activos.update');
