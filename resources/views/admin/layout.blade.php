@@ -70,16 +70,20 @@
                     📊 Vista Ejecutiva
                 </a>
                 <a href="{{ route('admin.usuarios.index') }}" 
-                   class="flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-semibold transition {{ request()->routeIs('admin.usuarios.*') ? 'bg-blue-600 text-white shadow-lg' : 'text-gray-400 hover:bg-[#1e2330] hover:text-white' }}">
+                   class="flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-semibold transition {{ request()->routeIs('admin.usuarios*') ? 'bg-blue-600 text-white shadow-lg' : 'text-gray-400 hover:bg-[#1e2330] hover:text-white' }}">
                     👥 Gestión de Usuarios
                 </a>
                 <a href="{{ route('admin.catalogos') }}"
-                    class="flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-semibold transition {{ request()->routeIs('admin.usuarios.*') ? 'bg-blue-600 text-white shadow-lg' : 'text-gray-400 hover:bg-[#1e2330] hover:text-white' }}">
+                    class="flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-semibold transition {{ request()->routeIs('admin.catalogos*') ? 'bg-blue-600 text-white shadow-lg' : 'text-gray-400 hover:bg-[#1e2330] hover:text-white' }}">
                     📚 Catálogos
                 </a>
 
                 <a href="{{ route('admin.reportes.config') }}" class="bg-purple-600 hover:bg-purple-700 text-white text-sm font-semibold py-2 px-4 rounded-lg shadow-md transition flex items-center gap-2">
                     📄 Configurar Reporte
+                </a>
+
+                <a href="{{ route('admin.validarPatrimonio') }}" class="bg-purple-600 hover:bg-purple-700 text-white text-sm font-semibold py-2 px-4 rounded-lg shadow-md transition flex items-center gap-2">
+                    📜 Validar Patrimonio 
                 </a>
             </nav>
         </div>

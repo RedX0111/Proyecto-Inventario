@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
+use Barryvdh\DomPDF\Facade\Pdf;
 
 class AdminController extends Controller
 {
@@ -90,7 +91,6 @@ class AdminController extends Controller
             ->select(
                 'ubicacion',
                 DB::raw('COUNT(*) as total_activos'),
-                // Contamos cuántos de esos activos ya están "CENSADOS"
                 DB::raw("SUM(CASE WHEN constatado_actual ILIKE 'CENSADO' THEN 1 ELSE 0 END) as verificados")
             )
             ->groupBy('ubicacion')
@@ -105,7 +105,6 @@ class AdminController extends Controller
         foreach ($ubicacionesStats as $stat) {
             $chartUbiLabels[] = $stat->ubicacion;
             $chartUbiVerificados[] = (int) $stat->verificados;
-            // El pendiente se calcula restando lo verificado al total de activos en esa ubicación
             $chartUbiPendientes[] = (int) $stat->total_activos - (int) $stat->verificados; 
         }
 
@@ -119,30 +118,17 @@ class AdminController extends Controller
         $chartEstLabels = $estadosFisicos->pluck('estado');
         $chartEstData = $estadosFisicos->pluck('total');
 
-        // Gráfico de Tipos (Nuevo)
+        // 6. Gráfico: Distribución por Tipo de Activo
         $tiposActivos = DB::table('v_bd_tabla_master')
             ->where('anio_auditoria', $anioSeleccionado)
-            ->select('tipo', DB::raw('count(*) as total'))
-            ->groupBy('tipo')
-            ->orderBy('total', 'desc')
-            ->limit(5)
-            ->get();
-
-        $chartTipoLabels = $tiposActivos->pluck('tipo');
-        $chartTipoData = $tiposActivos->pluck('total');
-
-        // 6. NUEVO GRÁFICO: Distribución por Tipo de Activo
-        $tiposActivos = DB::table('v_bd_tabla_master')
-            ->where('anio_auditoria', $anioSeleccionado)
-            ->whereNotNull('tipo') // Ignoramos nulos
-            ->where('tipo', '!=', '') // Ignoramos vacíos
+            ->whereNotNull('tipo')
+            ->where('tipo', '!=', '')
             ->select('tipo', DB::raw('COUNT(*) as total'))
             ->groupBy('tipo')
-            ->orderBy('total', 'desc') // Ordenamos del tipo con más activos al menor
-            ->limit(7) // Traemos el Top 7 para no saturar el gráfico visualmente
+            ->orderBy('total', 'desc')
+            ->limit(7)
             ->get();
 
-        // Convertimos a arreglos simples para que Chart.js los procese sin errores
         $chartTipoLabels = $tiposActivos->pluck('tipo')->toArray();
         $chartTipoData = $tiposActivos->pluck('total')->toArray();
 
@@ -162,8 +148,6 @@ class AdminController extends Controller
             'chartUbiPendientes',
             'chartEstLabels',
             'chartEstData',
-            'chartTipoLabels',
-            'chartTipoData',
             'chartTipoLabels',
             'chartTipoData',
             'colores',
@@ -200,13 +184,11 @@ class AdminController extends Controller
             }
 
             foreach ($items as $item) {
-                // EVITAR ERROR: Ignorar filas en blanco generadas por Google Sheets
                 if (empty($item['codigo'])) {
                     continue; 
                 }
 
                 DB::table('bd_staging_censo')->insert([
-                    // SANITIZACIÓN POSTGRESQL: Forzar los tipos de datos correctos
                     'stg_orden' => !empty($item['orden']) ? (int) $item['orden'] : null,
                     'codigo_patrimonial' => (string) $item['codigo'],
                     'denominacion' => !empty($item['denominacion']) ? (string) $item['denominacion'] : 'SIN DENOMINACION',
@@ -251,13 +233,9 @@ class AdminController extends Controller
                 return back()->with('error', 'No hay datos en el lote para aprobar.');
             }
 
-            // Diccionario temporal para guardar los IDs de los censos por año y no saturar la BD
             $cacheCensos = []; 
 
-            // 1. Procesar cada registro
             foreach ($registros as $reg) {
-                
-                // A) Determinar el periodo y censo dinámicamente según la data de Sheets
                 $anio = $reg->anio_auditoria ?? date('Y', strtotime($reg->fecha_censo ?? now()));
 
                 if (!isset($cacheCensos[$anio])) {
@@ -281,27 +259,22 @@ class AdminController extends Controller
 
                 $cer_id = $cacheCensos[$anio];
 
-                // B) Normalizar Marca
                 $mar_nombre = trim($reg->marca) ?: 'SIN MARCA';
                 $marca = DB::table('mar_marcas')->where('mar_nombre', 'ILIKE', $mar_nombre)->first();
                 $mar_id = $marca ? $marca->mar_id : DB::table('mar_marcas')->insertGetId(['mar_nombre' => $mar_nombre], 'mar_id');
 
-                // C) Normalizar Modelo
                 $mod_nombre = trim($reg->modelo) ?: 'SIN MODELO';
                 $modelo = DB::table('mod_modelos')->where('mod_nombre', 'ILIKE', $mod_nombre)->where('mar_id', $mar_id)->first();
                 $mod_id = $modelo ? $modelo->mod_id : DB::table('mod_modelos')->insertGetId(['mod_nombre' => $mod_nombre, 'mar_id' => $mar_id], 'mod_id');
 
-                // D) Normalizar Color
                 $col_nombre = trim($reg->color) ?: 'SIN COLOR';
                 $color = DB::table('col_colores')->where('col_nombre', 'ILIKE', $col_nombre)->first();
                 $col_id = $color ? $color->col_id : DB::table('col_colores')->insertGetId(['col_nombre' => $col_nombre], 'col_id');
 
-                // E) Normalizar Tipo/Clasificador
                 $cla_nombre = trim($reg->tipo) ?: 'SIN TIPO';
                 $clasificador = DB::table('sla_clasificadores')->where('cla_descripcion', 'ILIKE', $cla_nombre)->first();
                 $cla_id = $clasificador ? $clasificador->cla_id : DB::table('sla_clasificadores')->insertGetId(['cla_descripcion' => $cla_nombre], 'cla_id');
 
-                // F) Normalizar Ubicación
                 $ubi_nombre = trim($reg->ubicacion) ?: 'GENERAL';
                 $ubicacion = DB::table('bd_ubicaciones')->where('ubi_nombre', 'ILIKE', $ubi_nombre)->first();
                 $ubi_id = $ubicacion ? $ubicacion->ubi_id : DB::table('bd_ubicaciones')->insertGetId([
@@ -309,12 +282,10 @@ class AdminController extends Controller
                     'ubi_codigo' => uniqid('U-') 
                 ], 'ubi_id');
 
-                // G) Normalizar Estado Físico
                 $est_nombre = trim($reg->estado) ?: 'BUENO';
                 $estado = DB::table('bd_estados_fisicos')->where('est_nombre', 'ILIKE', $est_nombre)->first();
                 $est_id = $estado ? $estado->est_id : DB::table('bd_estados_fisicos')->insertGetId(['est_nombre' => $est_nombre], 'est_id');
 
-                // H) Actualizar o Insertar el Activo
                 DB::table('bd_activos_maestro')->updateOrInsert(
                     ['act_codigo' => $reg->codigo_patrimonial],
                     [
@@ -330,7 +301,6 @@ class AdminController extends Controller
 
                 $activo = DB::table('bd_activos_maestro')->where('act_codigo', $reg->codigo_patrimonial)->first();
 
-                // I) Vincular el Activo al Censo dinámico
                 DB::table('bd_censo_campo')->updateOrInsert(
                     ['cer_id' => $cer_id, 'act_id' => $activo->act_id],
                     [
@@ -342,7 +312,6 @@ class AdminController extends Controller
                 );
             }
 
-            // 2. Limpiar Staging
             DB::table('bd_staging_censo')->truncate();
 
             DB::commit();
@@ -360,20 +329,16 @@ class AdminController extends Controller
     public function cerrarPeriodo(Request $request, $id)
     {
         try {
-            // 1. Buscamos el período en la base de datos
             $periodo = DB::table('bd_periodos_fiscales')->where('per_id', $id)->first();
 
-            // 2. Verificamos que exista
             if (!$periodo) {
                 return back()->with('error', 'El período no existe.');
             }
 
-            // 3. CANDADO DE SEGURIDAD: Si ya está cerrado, abortamos la operación
             if ($periodo->per_cerrado == 1) {
                 return back()->with('error', 'Acción denegada: Este período ya fue cerrado el ' . $periodo->per_fecha_cierre . ' y no puede modificarse.');
             }
 
-            // 4. Si está abierto, procedemos a cerrarlo y estampar la fecha
             DB::table('bd_periodos_fiscales')
                 ->where('per_id', $id)
                 ->update([
@@ -389,44 +354,81 @@ class AdminController extends Controller
     }
 
     /**
-     * Actualiza un activo patrimonial desde el modal de edición del dashboard.
+     * Actualiza un activo patrimonial y toda su información relacionada desde el modal del dashboard.
      */
     public function activosUpdate(Request $request, $codigo)
     {
         $request->validate([
             'denominacion' => 'required|string|max:255',
-            'dimensiones' => 'nullable|string|max:100',
+            'serie'        => 'nullable|string|max:100',
+            'dimensiones'  => 'nullable|string|max:100',
         ]);
 
         try {
-            // 1. Actualizamos utilizando tu código original que sí funciona
-            DB::table('bd_activos_maestro')
-                ->where('act_codigo', $codigo)
-                ->update([
-                    'act_denominacion' => $request->input('denominacion'),
-                    'act_dimensiones' => $request->input('dimensiones', 'SIN DIMENSIONES'),
-                    'mod_id' => $request->input('mod_id'),
-                    'col_id' => $request->input('col_id'),
-                    'cla_id' => $request->input('cla_id'),
-                    'updated_at' => now(),
-                ]);
+            DB::beginTransaction();
 
-            // 2. Buscamos el act_id para registrar la trazabilidad sin interferir con la actualización
-            $actId = DB::table('bd_activos_maestro')->where('act_codigo', $codigo)->value('act_id');
+            $activo = DB::table('bd_activos_maestro')->where('act_codigo', $codigo)->first();
 
-            if ($actId) {
-                DB::table('aud_bitacora_trazabilidad')->insert([
-                    'act_id' => $actId,
-                    'usu_id' => auth()->id() ?? 1,
-                    'aud_accion' => 'ACTUALIZACION',
-                    'aud_detalle' => "Actualización manual del activo {$codigo}: Denominación cambiada a '{$request->input('denominacion')}'",
-                    'created_at' => now(),
-                ]);
+            if (!$activo) {
+                return back()->with('error', "No se encontró el activo con código {$codigo}.");
             }
 
-            return back()->with('success', "¡Activo {$codigo} actualizado correctamente en el padrón maestro y registrado en la bitácora!");
+            // 1. Verificar relación Marca -> Modelo si el usuario cambió la marca
+            $modId = $request->input('mod_id') ?: $activo->mod_id;
+            if ($request->filled('mar_id') && $modId) {
+                DB::table('mod_modelos')
+                    ->where('mod_id', $modId)
+                    ->update(['mar_id' => $request->input('mar_id')]);
+            }
+
+            // 2. Actualizar datos maestros en bd_activos_maestro
+            DB::table('bd_activos_maestro')
+                ->where('act_id', $activo->act_id)
+                ->update([
+                    'act_denominacion' => strtoupper(trim($request->input('denominacion'))),
+                    'act_serie'        => strtoupper(trim($request->input('serie', 'SIN SERIE'))),
+                    'act_dimensiones'  => strtoupper(trim($request->input('dimensiones', 'SIN DIMENSIONES'))),
+                    'mod_id'           => $modId,
+                    'col_id'           => $request->input('col_id') ?: $activo->col_id,
+                    'cla_id'           => $request->input('cla_id') ?: $activo->cla_id,
+                    'updated_at'       => now(),
+                ]);
+
+            // 3. Actualizar datos de ubicación, estado físico y constatación en bd_censo_campo
+            $datosCenso = [];
+            if ($request->filled('est_id')) {
+                $datosCenso['est_id'] = $request->input('est_id');
+            }
+            if ($request->filled('ubi_id')) {
+                $datosCenso['ubi_id'] = $request->input('ubi_id');
+            }
+            if ($request->filled('constatado_actual')) {
+                $datosCenso['cdk_estado_limpieza'] = strtoupper(trim($request->input('constatado_actual')));
+            }
+            if ($request->filled('alerta_movimiento')) {
+                $datosCenso['cdk_etiqueta_estado'] = strtoupper(trim($request->input('alerta_movimiento')));
+            }
+
+            if (!empty($datosCenso)) {
+                DB::table('bd_censo_campo')
+                    ->where('act_id', $activo->act_id)
+                    ->update($datosCenso);
+            }
+
+            // 4. Registrar la modificación completa en la bitácora de trazabilidad
+            DB::table('aud_bitacora_trazabilidad')->insert([
+                'act_id'      => $activo->act_id,
+                'usu_id'      => auth()->id() ?? 1,
+                'aud_accion'  => 'ACTUALIZACION INTEGRAL',
+                'aud_detalle' => "Actualización completa del activo {$codigo} (Denominación, Serie, Catálogos y Estado/Ubicación).",
+                'created_at'  => now(),
+            ]);
+
+            DB::commit();
+            return back()->with('success', "¡Activo {$codigo} y todos sus datos relacionados fueron actualizados correctamente!");
 
         } catch (\Exception $e) {
+            DB::rollBack();
             return back()->with('error', 'Error al actualizar el activo: ' . $e->getMessage());
         }
     }
@@ -436,7 +438,6 @@ class AdminController extends Controller
      */
     public function activosStore(Request $request)
     {
-        // 1. Validar que el código no exista ya en la base de datos
         $request->validate([
             'codigo_patrimonial' => 'required|string|unique:bd_activos_maestro,act_codigo|max:50',
             'denominacion' => 'required|string|max:255',
@@ -454,7 +455,6 @@ class AdminController extends Controller
 
             $codigo = $request->input('codigo_patrimonial');
 
-            // 2. Insertar en el padrón maestro (Recordando el 2do parámetro 'act_id' para PostgreSQL)
             $act_id = DB::table('bd_activos_maestro')->insertGetId([
                 'act_codigo' => $codigo,
                 'act_denominacion' => $request->input('denominacion'),
@@ -463,12 +463,11 @@ class AdminController extends Controller
                 'mod_id' => $request->input('mod_id'),
                 'col_id' => $request->input('col_id'),
                 'cla_id' => $request->input('cla_id'),
-                'act_es_temporal' => $request->input('es_temporal', 0), // Útil si quieres marcarlo como "Sobrante" (1)
+                'act_es_temporal' => $request->input('es_temporal', 0),
                 'created_at' => now(),
                 'updated_at' => now(),
             ], 'act_id');
 
-            // 3. Registrar la acción en la bitácora de trazabilidad
             DB::table('aud_bitacora_trazabilidad')->insert([
                 'act_id' => $act_id,
                 'usu_id' => auth()->id() ?? 1,
@@ -477,7 +476,6 @@ class AdminController extends Controller
                 'created_at' => now(),
             ]);
 
-            // 4. Vincular el activo al periodo fiscal abierto para que aparezca en el Dashboard
             $periodo = DB::table('bd_periodos_fiscales')->where('per_cerrado', 0)->first();
             
             if ($periodo) {
@@ -494,7 +492,7 @@ class AdminController extends Controller
                     'act_id' => $act_id,
                     'est_id' => $request->input('est_id'),
                     'ubi_id' => $request->input('ubi_id'),
-                    'cdk_estado_limpieza' => 'CENSADO', // Da por hecho que ya está verificado
+                    'cdk_estado_limpieza' => 'CENSADO',
                     'cdk_etiqueta_estado' => 'NUEVO REGISTRO'
                 ]);
             }
@@ -526,7 +524,6 @@ class AdminController extends Controller
     public function usuariosStore(Request $request)
     {
         try {
-            // Insertamos capturando los campos adaptándose a cualquier nombre que tenga el input en tu Blade
             DB::table('bd_usuarios')->insert([
                 'usu_dni' => $request->input('dni') ?? $request->input('usu_dni'),
                 'usu_nombres' => $request->input('nombres') ?? $request->input('usu_nombres'),
@@ -551,7 +548,6 @@ class AdminController extends Controller
     public function usuariosUpdate(Request $request, $id)
     {
         try {
-            // Preparamos los datos a actualizar adaptándonos a los campos del formulario
             $datosActualizacion = [
                 'usu_dni' => $request->input('dni') ?? $request->input('usu_dni'),
                 'usu_nombres' => $request->input('nombres') ?? $request->input('usu_nombres'),
@@ -560,12 +556,10 @@ class AdminController extends Controller
                 'rol_id' => $request->input('rol_id'),
             ];
 
-            // Si el usuario ingresó una nueva contraseña, la actualizamos cifrada; si no, la omitimos
             if ($request->filled('password')) {
                 $datosActualizacion['password'] = bcrypt($request->input('password'));
             }
 
-            // Ejecutamos la actualización basada en el identificador único (usu_id)
             DB::table('bd_usuarios')
                 ->where('usu_id', $id)
                 ->update($datosActualizacion);
@@ -579,20 +573,16 @@ class AdminController extends Controller
 
     public function dashboardIndex()
     {
-        // 1. Total de activos en el padrón maestro
         $totalActivos = DB::table('bd_activos_maestro')->count();
 
-        // 2. Activos verificados en el censo actual (ej. año 2026 o último censo)
         $activosVerificados = DB::table('cen_censos')
             ->whereYear('cer_fecha', 2026)
             ->distinct('act_id')
             ->count('act_id');
 
-        // Cobertura de verificación
         $cobertura = $totalActivos > 0 ? round(($activosVerificados / $totalActivos) * 100) : 0;
         $pendientes = $totalActivos - $activosVerificados;
 
-        // 3. Alertas de movimiento / trazabilidad (ej: eventos registrados en la bitácora)
         $alertasNoEncontradas = DB::table('aud_bitacora_trazabilidad')
             ->where('aud_accion', 'NO_ENCONTRADO')
             ->count();
@@ -601,7 +591,6 @@ class AdminController extends Controller
             ->where('aud_accion', 'CAMBIO_UBICACION')
             ->count();
 
-        // Detalle de últimas alertas para la tabla de trazabilidad
         $detalleAlertas = DB::table('aud_bitacora_trazabilidad')
             ->join('bd_activos_maestro', 'aud_bitacora_trazabilidad.act_id', '=', 'bd_activos_maestro.act_id')
             ->select(
@@ -631,25 +620,19 @@ class AdminController extends Controller
     public function usuariosDestroy($id)
     {
         try {
-            // Evitar que el usuario administrador cambie el estado de su propia cuenta
             if (auth()->check() && auth()->id() == $id) {
                 return back()->with('error', 'No puedes cambiar el estado de tu propia cuenta mientras estás en sesión.');
             }
 
-            // Buscamos el usuario actual
             $usuario = DB::table('bd_usuarios')->where('usu_id', $id)->first();
 
             if (!$usuario) {
                 return back()->with('error', 'Usuario no encontrado.');
             }
 
-            // Invertimos el estado lógico (Si es 1 pasa a 0, si es 0 pasa a 1)
             $nuevoEstado = $usuario->usu_activo == 1 ? 0 : 1;
-            
-            // Mensaje dinámico según la acción realizada
             $mensaje = $nuevoEstado == 1 ? '¡Usuario reactivado correctamente!' : '¡Usuario desactivado correctamente!';
 
-            // Actualizamos la BD
             DB::table('bd_usuarios')
                 ->where('usu_id', $id)
                 ->update(['usu_activo' => $nuevoEstado]);
@@ -662,7 +645,7 @@ class AdminController extends Controller
     }
 
     /**
-     * Muestra el panel de gestión de catálogos (Marcas, Colores, Tipos, Denominaciones, etc.)
+     * Muestra el panel de gestión de catálogos.
      */
     public function catalogosIndex()
     {
@@ -670,7 +653,7 @@ class AdminController extends Controller
                             ->select('act_denominacion as nombre')
                             ->distinct()
                             ->orderBy('act_denominacion')
-                            ->get(); // O puedes crear una tabla catálogo específica si lo prefieres
+                            ->get();
 
         $marcas = DB::table('mar_marcas')->orderBy('mar_nombre')->get();
         $colores = DB::table('col_colores')->orderBy('col_nombre')->get();
@@ -696,7 +679,6 @@ class AdminController extends Controller
 
         try {
             if ($tipo === 'denominacion') {
-                // Las denominaciones se actualizan directamente en los activos que las poseían
                 $viejoNombre = $request->input('viejo_nombre');
                 DB::table('bd_activos_maestro')
                     ->where('act_denominacion', $viejoNombre)
@@ -765,7 +747,7 @@ class AdminController extends Controller
     }
 
     /**
-     * Procesa los filtros y genera el reporte en Pantalla/Impresión o CSV/Excel.
+     * Procesa los filtros y muestra la vista de impresión/PDF nativa.
      */
     public function reportesGenerar(Request $request)
     {
@@ -796,9 +778,10 @@ class AdminController extends Controller
         $columnasSeleccionadas = $request->input('columnas', [
             'codigo_patrimonial', 'denominacion', 'marca', 'serie', 'ubicacion', 'estado', 'constatado_actual'
         ]);
-        $formato = $request->input('formato', 'pantalla'); // 'pantalla' para imprimir o 'excel' para CSV
+        
+        $formato = $request->input('formato', 'pantalla');
 
-        // Si el usuario elige Excel / CSV
+        // Si el usuario elige exportar a Excel / CSV
         if ($formato === 'excel') {
             $filename = "reporte_patrimonial_" . date('Y-m-d') . ".csv";
             $headers = [
@@ -813,7 +796,6 @@ class AdminController extends Controller
                 $file = fopen('php://output', 'w');
                 fprintf($file, chr(0xEF).chr(0xBB).chr(0xBF)); // Soporte tildes UTF-8 Excel
                 
-                // Cabeceras del CSV
                 fputcsv($file, array_map('ucfirst', $columnasSeleccionadas), ';');
 
                 foreach ($registros as $reg) {
@@ -829,7 +811,211 @@ class AdminController extends Controller
             return response()->stream($callback, 200, $headers);
         }
 
-        // Si el usuario elige Vista de Impresión / Pantalla
+        // Si elige Vista Previa / Guardar PDF (Nativo mediante motor del navegador)
         return view('admin.reportes_print', compact('registros', 'columnasSeleccionadas'));
+    }
+    
+    public function validarPatrimonioIndex(Request $request)
+    {
+        $resultadosValidacion = null;
+
+        if ($request->hasFile('archivo_csv')) {
+            $file = $request->file('archivo_csv');
+            $totalFilas = 0;
+            $actualizados = 0;
+            $errores = [];
+            
+            if (($handle = fopen($file->getRealPath(), 'r')) !== FALSE) {
+                $header = fgetcsv($handle, 1000, ","); // Leer cabeceras del CSV
+                
+                // Normalizamos cabeceras (minúsculas y sin espacios)
+                $header = array_map(function($h) {
+                    return strtolower(trim(str_replace("\xEF\xBB\xBF", "", $h))); // Remueve BOM si existe
+                }, $header);
+
+                while (($data = fgetcsv($handle, 1000, ",")) !== FALSE) {
+                    if (count($data) >= count($header)) {
+                        $fila = array_combine(array_slice($header, 0, count($data)), $data);
+                        $totalFilas++;
+
+                        $codigo = trim($fila['codigo_patrimonial'] ?? '');
+                        
+                        if (empty($codigo)) {
+                            $errores[] = "Fila {$totalFilas}: El código patrimonial está vacío en el CSV.";
+                            continue;
+                        }
+
+                        // Buscar el activo en el padrón maestro
+                        $activoBD = DB::table('bd_activos_maestro')->where('act_codigo', $codigo)->first();
+
+                        if (!$activoBD) {
+                            $errores[] = "Fila {$totalFilas}: El código '{$codigo}' no existe en el padrón maestro.";
+                        } else {
+                            try {
+                                DB::beginTransaction();
+
+                                // Preparamos los datos nuevos del CSV (SIN MODIFICAR LA DENOMINACIÓN)
+                                $nuevaSerie = strtoupper(trim($fila['serie'] ?? $activoBD->act_serie));
+                                $nuevaMarca = strtoupper(trim($fila['marca'] ?? ''));
+                                $nuevoModelo = strtoupper(trim($fila['modelo'] ?? ''));
+                                $nuevoColor = strtoupper(trim($fila['color'] ?? ''));
+                                $nuevaUbicacion = strtoupper(trim($fila['ubicacion'] ?? ''));
+                                $nuevoEstado = strtoupper(trim($fila['estado'] ?? ''));
+
+                                // 1. Obtener la marca a través del modelo actual del activo (si existe)
+                                $modeloActual = DB::table('mod_modelos')->where('mod_id', $activoBD->mod_id)->first();
+                                $marId = $modeloActual ? $modeloActual->mar_id : null;
+
+                                if (!empty($nuevaMarca)) {
+                                    $m = DB::table('mar_marcas')->where('mar_nombre', 'ILIKE', $nuevaMarca)->first();
+                                    $marId = $m ? $m->mar_id : DB::table('mar_marcas')->insertGetId(['mar_nombre' => $nuevaMarca], 'mar_id');
+                                }
+
+                                $modId = $activoBD->mod_id;
+                                if (!empty($nuevoModelo) || $marId !== ($modeloActual ? $modeloActual->mar_id : null)) {
+                                    $nombreMod = !empty($nuevoModelo) ? $nuevoModelo : ($modeloActual ? $modeloActual->mod_nombre : 'SIN MODELO');
+                                    
+                                    $mo = DB::table('mod_modelos')
+                                        ->where('mod_nombre', 'ILIKE', $nombreMod)
+                                        ->where('mar_id', $marId)
+                                        ->first();
+                                        
+                                    $modId = $mo ? $mo->mod_id : DB::table('mod_modelos')->insertGetId([
+                                        'mod_nombre' => $nombreMod, 
+                                        'mar_id' => $marId
+                                    ], 'mod_id');
+                                }
+
+                                $colId = $activoBD->col_id;
+                                if (!empty($nuevoColor)) {
+                                    $c = DB::table('col_colores')->where('col_nombre', 'ILIKE', $nuevoColor)->first();
+                                    $colId = $c ? $c->col_id : DB::table('col_colores')->insertGetId(['col_nombre' => $nuevoColor], 'col_id');
+                                }
+
+                                // Buscamos la relación transaccional actual en censo_campo
+                                $censoCampoActual = DB::table('bd_censo_campo')->where('act_id', $activoBD->act_id)->first();
+                                $ubiId = $censoCampoActual ? $censoCampoActual->ubi_id : null;
+                                
+                                if (!empty($nuevaUbicacion)) {
+                                    $u = DB::table('bd_ubicaciones')->where('ubi_nombre', 'ILIKE', $nuevaUbicacion)->first();
+                                    $ubiId = $u ? $u->ubi_id : DB::table('bd_ubicaciones')->insertGetId([
+                                        'ubi_nombre' => $nuevaUbicacion, 
+                                        'ubi_codigo' => uniqid('UB-')
+                                    ], 'ubi_id');
+                                }
+
+                                $estId = $censoCampoActual ? $censoCampoActual->est_id : null;
+                                if (!empty($nuevoEstado)) {
+                                    $e = DB::table('bd_estados_fisicos')->where('est_nombre', 'ILIKE', $nuevoEstado)->first();
+                                    $estId = $e ? $e->est_id : DB::table('bd_estados_fisicos')->insertGetId(['est_nombre' => $nuevoEstado], 'est_id');
+                                }
+
+                                // 2. Actualizar el padrón maestro (Respetando act_denominacion actual)
+                                DB::table('bd_activos_maestro')
+                                    ->where('act_codigo', $codigo)
+                                    ->update([
+                                        'act_serie' => $nuevaSerie,
+                                        'mod_id' => $modId,
+                                        'col_id' => $colId,
+                                        'updated_at' => now(),
+                                    ]);
+
+                                // 3. Actualizar la relación transaccional de campo (ubicación y estado) si existe registro
+                                if ($censoCampoActual) {
+                                    DB::table('bd_censo_campo')
+                                        ->where('act_id', $activoBD->act_id)
+                                        ->update([
+                                            'ubi_id' => $ubiId,
+                                            'est_id' => $estId,
+                                        ]);
+                                }
+
+                                // 4. Registrar en la bitácora de trazabilidad
+                                DB::table('aud_bitacora_trazabilidad')->insert([
+                                    'act_id' => $activoBD->act_id,
+                                    'usu_id' => auth()->id() ?? 1,
+                                    'aud_accion' => 'VALIDACION Y ACTUALIZACION CSV',
+                                    'aud_detalle' => "Datos actualizados mediante validación masiva CSV (Código: {$codigo})",
+                                    'created_at' => now(),
+                                ]);
+
+                                DB::commit();
+                                $actualizados++;
+
+                            } catch (\Exception $e) {
+                                DB::rollBack();
+                                $errores[] = "Fila {$totalFilas} (Código {$codigo}): Error al actualizar -> " . $e->getMessage();
+                            }
+                        }
+                    }
+                }
+                fclose($handle);
+                
+                $resultadosValidacion = [
+                    'total' => $totalFilas,
+                    'actualizados' => $actualizados,
+                    'errores' => $errores
+                ];
+            }
+        }
+
+        $columnasRequeridasInfo = [
+            ['columna' => 'codigo_patrimonial', 'descripcion' => 'Código único de 12 dígitos asignado por la SBN (Clave de búsqueda obligatoria).', 'obligatorio' => 'Sí'],
+            ['columna' => 'denominacion', 'descripcion' => 'Nombre oficial (Se omite su cambio automático para preservar el catálogo original).', 'obligatorio' => 'Informativo'],
+            ['columna' => 'marca', 'descripcion' => 'Fabricante o marca comercial del bien (Se actualizará o registrará automáticamente).', 'obligatorio' => 'Sí'],
+            ['columna' => 'modelo', 'descripcion' => 'Modelo o versión del equipo.', 'obligatorio' => 'Recomendado'],
+            ['columna' => 'serie', 'descripcion' => 'Número de serie de fábrica.', 'obligatorio' => 'Condicional'],
+            ['columna' => 'color', 'descripcion' => 'Color predominante del bien.', 'obligatorio' => 'Sí'],
+            ['columna' => 'ubicacion', 'descripcion' => 'Ambiente físico asignado (Actualiza la ubicación en campo).', 'obligatorio' => 'Sí'],
+            ['columna' => 'estado', 'descripcion' => 'Estado físico actual (Bueno, Regular, Malo).', 'obligatorio' => 'Sí']
+        ];
+
+        return view('admin.validar_patrimonio', compact('columnasRequeridasInfo', 'resultadosValidacion'));
+    }
+
+    /**
+     * Procesa la actualización o completado de datos faltantes para cumplir con Patrimonio.
+     */
+    public function validarPatrimonioProcesar(Request $request)
+    {
+        $codigo = $request->input('codigo_patrimonial');
+
+        $request->validate([
+            'codigo_patrimonial' => 'required|string',
+            'denominacion' => 'required|string|max:255',
+            'serie' => 'nullable|string|max:100',
+            'dimensiones' => 'nullable|string|max:100',
+        ]);
+
+        try {
+            DB::beginTransaction();
+
+            DB::table('bd_activos_maestro')
+                ->where('act_codigo', $codigo)
+                ->update([
+                    'act_denominacion' => strtoupper(trim($request->input('denominacion'))),
+                    'act_serie' => strtoupper(trim($request->input('serie', 'SIN SERIE'))),
+                    'act_dimensiones' => strtoupper(trim($request->input('dimensiones', 'SIN DIMENSIONES'))),
+                    'mod_id' => $request->input('mod_id'),
+                    'col_id' => $request->input('col_id'),
+                    'cla_id' => $request->input('cla_id'),
+                    'updated_at' => now(),
+                ]);
+
+            DB::table('aud_bitacora_trazabilidad')->insert([
+                'act_id' => DB::table('bd_activos_maestro')->where('act_codigo', $codigo)->value('act_id'),
+                'usu_id' => auth()->id() ?? 1,
+                'aud_accion' => 'VALIDACION PATRIMONIO',
+                'aud_detalle' => "Completado/Validación de datos obligatorios para el activo {$codigo}",
+                'created_at' => now(),
+            ]);
+
+            DB::commit();
+            return back()->with('success', "¡Activo {$codigo} validado y actualizado correctamente!");
+
+        } catch (\Exception $e) {
+            DB::rollBack();
+            return back()->with('error', 'Error al validar el activo: ' . $e->getMessage());
+        }
     }
 }

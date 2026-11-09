@@ -79,26 +79,23 @@
         </button>
     </div>
 
-    <!-- PESTAÑA 1: RESUMEN (Solo KPIs y Gráficos)         -->
+    <!-- PESTAÑA 1: RESUMEN (Solo KPIs y Gráficos) -->
     <div id="contenido-resumen" class="space-y-8" style="display: block;">
         
-        <!-- KPIs de Resumen (Diseño limpio sin fondo de tarjeta) -->
+        <!-- KPIs de Resumen -->
         <div class="grid grid-cols-1 md:grid-cols-3 gap-6 pt-2 px-2">
-            <!-- Cobertura de verificación -->
             <div>
                 <p class="text-[15px] font-semibold text-gray-300">Cobertura de verificación</p>
                 <h3 class="text-4xl font-bold text-white mt-1">{{ $porcentajeAvance }}%</h3>
                 <p class="text-sm text-gray-500 mt-1">{{ $verificados }} de {{ $totalActivos }} activos</p>
             </div>
             
-            <!-- Pendientes -->
             <div>
                 <p class="text-[15px] font-semibold text-gray-300">Pendientes</p>
                 <h3 class="text-4xl font-bold text-white mt-1">{{ $pendientes }}</h3>
                 <p class="text-sm text-gray-500 mt-1">{{ 100 - $porcentajeAvance }}% restante</p>
             </div>
             
-            <!-- Deterioro interanual -->
             <div>
                 <p class="text-[15px] font-semibold text-gray-300">Deterioro interanual</p>
                 <h3 class="text-4xl font-bold text-white mt-1">{{ $deterioro ?? '6' }}%</h3>
@@ -108,26 +105,21 @@
 
         <!-- GRÁFICOS DE RESUMEN -->
         <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            <!-- Gráfico: Avance por ubicación -->
             <div class="bg-transparent border border-gray-800 rounded-xl p-5 shadow-sm lg:row-span-2 flex flex-col">
                 <h3 class="text-white font-bold mb-6 text-lg tracking-wide">Avance por ubicación</h3>
-                <!-- Altura incrementada a 600px para que las barras respiren -->
                 <div class="relative h-[600px] w-full flex-1">
                     <canvas id="chartUbicaciones"></canvas>
                 </div>
             </div>
 
             <div class="flex flex-col gap-6">
-            
                 <div class="bg-transparent border border-gray-800 rounded-xl p-5 shadow-sm">
                     <h3 class="text-white font-bold mb-6 text-lg tracking-wide">Activos por estado</h3>
-                    <!-- Altura incrementada a h-72 (288px) -->
                     <div class="relative h-72 w-full">
                         <canvas id="chartEstados"></canvas>
                     </div>
                 </div>
 
-                <!-- Gráfico Inferior: NUEVO (Ejemplo: Activos por Tipo o Clasificación) -->
                 <div class="bg-transparent border border-gray-800 rounded-xl p-5 shadow-sm">
                     <h3 class="text-white font-bold mb-6 text-lg tracking-wide">Distribución por Tipo de Activo</h3>
                     <div class="relative h-72 w-full">
@@ -141,7 +133,6 @@
     <!-- PESTAÑA 2: TRAZABILIDAD (KPIs de Alertas + Tabla) -->
     <div id="contenido-trazabilidad" class="space-y-6" style="display: none;">
         
-        <!-- KPIs exclusivos de Trazabilidad -->
         <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div class="bg-red-950/40 border border-red-900/50 p-5 rounded-xl shadow-lg">
                 <p class="text-sm text-red-400">Activos no encontrados / incidencias</p>
@@ -215,7 +206,7 @@
             </form>
         </div>
 
-        <!-- TABLA DE DATOS PRINCIPAL (Mantenida intacta) -->
+        <!-- TABLA DE DATOS PRINCIPAL -->
         <div class="bg-[#1e2330] border-x border-b border-gray-800 rounded-b-xl shadow-sm overflow-hidden">
             <div class="overflow-x-auto p-1">
                 <table class="w-full text-left text-sm text-gray-300 whitespace-nowrap mt-2">
@@ -262,9 +253,9 @@
                             </td>
                             <td class="px-5 py-4 text-center">
                                 <div class="flex items-center justify-center gap-2">
-                                    <button type="button" 
-                                        onclick="abrirModalEdicion('{{ $reg->codigo_patrimonial }}', '{{ addslashes($reg->denominacion) }}', '{{ addslashes($reg->marca) }}', '{{ addslashes($reg->modelo) }}', '{{ addslashes($reg->tipo) }}', '{{ addslashes($reg->color) }}', '{{ addslashes($reg->dimensiones) }}', '{{ addslashes($reg->estado) }}', '{{ addslashes($reg->ubicacion) }}')"
-                                        class="bg-blue-500/10 text-blue-400 hover:bg-blue-500 hover:text-white border border-blue-500/20 px-3 py-1.5 rounded-lg text-xs font-semibold transition flex items-center gap-1.5" title="Editar registro">
+                                    <button type="button"
+                                        onclick='abrirModalEditar(@json($reg))'
+                                        class="bg-blue-600/10 hover:bg-blue-600 text-blue-400 hover:text-white border border-blue-500/20 px-3 py-1.5 rounded-lg text-xs font-semibold transition cursor-pointer">
                                         ✏️ Editar
                                     </button>
                                 </div>
@@ -290,249 +281,187 @@
     </div>
 </div>
 
-<!-- ================= MODAL FLOTANTE DE EDICIÓN ================= -->
-<div id="modalEditar" class="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center hidden p-4">
-    <div class="bg-[#161922] border border-gray-800 rounded-2xl w-full max-w-2xl shadow-2xl overflow-hidden transform transition-all">
+<!-- ================= MODAL EDITAR ACTIVO PATRIMONIAL COMPLETO ================= -->
+<div id="modalEditarActivo" class="fixed inset-0 bg-black/75 backdrop-blur-sm z-50 hidden items-center justify-center p-4 overflow-y-auto">
+    <div class="bg-[#161922] border border-gray-800 rounded-2xl w-full max-w-3xl shadow-2xl overflow-hidden my-8">
+        
         <div class="px-6 py-4 border-b border-gray-800 flex justify-between items-center bg-[#1e2330]">
             <h3 class="text-lg font-bold text-white flex items-center gap-2">
                 ✏️ Editar Activo Patrimonial
             </h3>
-            <button type="button" onclick="cerrarModalEdicion()" class="text-gray-400 hover:text-white text-xl font-bold">&times;</button>
+            <button type="button" onclick="cerrarModalEditar()" class="text-gray-400 hover:text-white text-xl font-bold leading-none cursor-pointer">&times;</button>
         </div>
 
-        <form id="formEditarActivo" method="POST" class="p-6 space-y-4">
+        <form id="formEditarActivo" method="POST" class="p-6 space-y-5">
             @csrf
             @method('PUT')
-            
-            <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+
+            <!-- FILA 1: Código y Denominación -->
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <div>
-                    <label class="block text-xs font-semibold text-gray-400 mb-1 uppercase">Código Patrimonial</label>
-                    <input type="text" id="edit_codigo" name="codigo_patrimonial" readonly class="bg-[#12141c] border border-gray-700 text-gray-500 rounded-lg p-2.5 w-full text-sm cursor-not-allowed">
+                    <label class="block text-[11px] font-semibold text-gray-400 mb-1 uppercase tracking-wider">Código Patrimonial</label>
+                    <input type="text" id="edit_codigo" name="codigo_patrimonial" readonly
+                        class="bg-[#12141c] border border-gray-800 text-gray-400 rounded-lg p-2.5 w-full text-sm cursor-not-allowed font-mono">
                 </div>
-                <div>
-                    <label class="block text-xs font-semibold text-gray-400 mb-1 uppercase">Denominación</label>
-                    <input type="text" id="edit_denominacion" name="denominacion" required class="bg-[#12141c] border border-gray-700 text-white rounded-lg p-2.5 w-full text-sm focus:ring-2 focus:ring-blue-500 outline-none">
-                </div>
-                <div>
-                    <label class="block text-xs font-semibold text-gray-400 mb-1 uppercase">Dimensiones</label>
-                    <input type="text" id="edit_dimensiones" name="dimensiones" class="bg-[#12141c] border border-gray-700 text-white rounded-lg p-2.5 w-full text-sm focus:ring-2 focus:ring-blue-500 outline-none">
+
+                <div class="md:col-span-2">
+                    <label class="block text-[11px] font-semibold text-gray-400 mb-1 uppercase tracking-wider">Denominación *</label>
+                    <input type="text" id="edit_denominacion" name="denominacion" required
+                        class="bg-[#12141c] border border-gray-700 text-white rounded-lg p-2.5 w-full text-sm focus:border-blue-500 outline-none">
                 </div>
             </div>
 
+            <!-- FILA 2: Serie y Dimensiones -->
             <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
-                    <label class="block text-xs font-semibold text-gray-400 mb-1 uppercase">Marca</label>
-                    <select name="mar_id" id="edit_mar_id" class="bg-[#12141c] border border-gray-700 text-white rounded-lg p-2.5 w-full text-sm focus:ring-2 focus:ring-blue-500 outline-none appearance-none">
-                        <option value="">Seleccionar Marca</option>
-                        @foreach($marcas as $marca)
-                            <option value="{{ $marca->mar_id }}">{{ $marca->mar_nombre }}</option>
+                    <label class="block text-[11px] font-semibold text-gray-400 mb-1 uppercase tracking-wider">Número de Serie</label>
+                    <input type="text" id="edit_serie" name="serie" placeholder="SIN SERIE"
+                        class="bg-[#12141c] border border-gray-700 text-white rounded-lg p-2.5 w-full text-sm focus:border-blue-500 outline-none">
+                </div>
+
+                <div>
+                    <label class="block text-[11px] font-semibold text-gray-400 mb-1 uppercase tracking-wider">Dimensiones</label>
+                    <input type="text" id="edit_dimensiones" name="dimensiones" placeholder="SIN DIMENSIONES"
+                        class="bg-[#12141c] border border-gray-700 text-white rounded-lg p-2.5 w-full text-sm focus:border-blue-500 outline-none">
+                </div>
+            </div>
+
+            <!-- FILA 3: Marca y Modelo -->
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                    <label class="block text-[11px] font-semibold text-gray-400 mb-1 uppercase tracking-wider">Marca</label>
+                    <select id="edit_mar_id" name="mar_id" onchange="filtrarModelosEditar()"
+                        class="bg-[#12141c] border border-gray-700 text-white rounded-lg p-2.5 w-full text-sm focus:border-blue-500 outline-none">
+                        <option value="">-- Seleccionar Marca --</option>
+                        @foreach($marcas as $m)
+                            <option value="{{ $m->mar_id }}" data-nombre="{{ strtoupper(trim($m->mar_nombre)) }}">
+                                {{ $m->mar_nombre }}
+                            </option>
                         @endforeach
                     </select>
                 </div>
 
                 <div>
-                    <label class="block text-xs font-semibold text-gray-400 mb-1 uppercase">Modelo</label>
-                    <select name="mod_id" id="edit_mod_id" class="bg-[#12141c] border border-gray-700 text-white rounded-lg p-2.5 w-full text-sm focus:ring-2 focus:ring-blue-500 outline-none appearance-none">
-                        <option value="">Seleccionar Modelo</option>
-                        @foreach($modelos as $modelo)
-                            <option value="{{ $modelo->mod_id }}">{{ $modelo->mod_nombre }}</option>
+                    <label class="block text-[11px] font-semibold text-gray-400 mb-1 uppercase tracking-wider">Modelo</label>
+                    <select id="edit_mod_id" name="mod_id"
+                        class="bg-[#12141c] border border-gray-700 text-white rounded-lg p-2.5 w-full text-sm focus:border-blue-500 outline-none">
+                        <option value="">-- Seleccionar Modelo --</option>
+                        @foreach($modelos as $mod)
+                            <option value="{{ $mod->mod_id }}" data-mar-id="{{ $mod->mar_id }}" data-nombre="{{ strtoupper(trim($mod->mod_nombre)) }}">
+                                {{ $mod->mod_nombre }}
+                            </option>
+                        @endforeach
+                    </select>
+                </div>
+            </div>
+
+            <!-- FILA 4: Tipo y Color -->
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                    <label class="block text-[11px] font-semibold text-gray-400 mb-1 uppercase tracking-wider">Tipo</label>
+                    <select id="edit_cla_id" name="cla_id"
+                        class="bg-[#12141c] border border-gray-700 text-white rounded-lg p-2.5 w-full text-sm focus:border-blue-500 outline-none">
+                        <option value="">-- Seleccionar Tipo --</option>
+                        @foreach($clasificadores as $c)
+                            <option value="{{ $c->cla_id }}" data-nombre="{{ strtoupper(trim($c->cla_descripcion)) }}">
+                                {{ $c->cla_descripcion }}
+                            </option>
                         @endforeach
                     </select>
                 </div>
 
                 <div>
-                    <label class="block text-xs font-semibold text-gray-400 mb-1 uppercase">Tipo</label>
-                    <select name="cla_id" id="edit_cla_id" class="bg-[#12141c] border border-gray-700 text-white rounded-lg p-2.5 w-full text-sm focus:ring-2 focus:ring-blue-500 outline-none appearance-none">
-                        <option value="">Seleccionar Tipo</option>
-                        @foreach($clasificadores as $clasificador)
-                            <option value="{{ $clasificador->cla_id }}">{{ $clasificador->cla_descripcion }}</option>
+                    <label class="block text-[11px] font-semibold text-gray-400 mb-1 uppercase tracking-wider">Color</label>
+                    <select id="edit_col_id" name="col_id"
+                        class="bg-[#12141c] border border-gray-700 text-white rounded-lg p-2.5 w-full text-sm focus:border-blue-500 outline-none">
+                        <option value="">-- Seleccionar Color --</option>
+                        @foreach($colores as $col)
+                            <option value="{{ $col->col_id }}" data-nombre="{{ strtoupper(trim($col->col_nombre)) }}">
+                                {{ $col->col_nombre }}
+                            </option>
+                        @endforeach
+                    </select>
+                </div>
+            </div>
+
+            <!-- FILA 5: Estado Físico y Ubicación -->
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                    <label class="block text-[11px] font-semibold text-gray-400 mb-1 uppercase tracking-wider">Estado Físico</label>
+                    <select id="edit_est_id" name="est_id"
+                        class="bg-[#12141c] border border-gray-700 text-white rounded-lg p-2.5 w-full text-sm focus:border-blue-500 outline-none">
+                        @foreach($estados as $est)
+                            <option value="{{ $est->est_id }}" data-nombre="{{ strtoupper(trim($est->est_nombre)) }}">
+                                {{ $est->est_nombre }}
+                            </option>
                         @endforeach
                     </select>
                 </div>
 
                 <div>
-                    <label class="block text-xs font-semibold text-gray-400 mb-1 uppercase">Color</label>
-                    <select name="col_id" id="edit_col_id" class="bg-[#12141c] border border-gray-700 text-white rounded-lg p-2.5 w-full text-sm focus:ring-2 focus:ring-blue-500 outline-none appearance-none">
-                        <option value="">Seleccionar Color</option>
-                        @foreach($colores as $color)
-                            <option value="{{ $color->col_id }}">{{ $color->col_nombre }}</option>
+                    <label class="block text-[11px] font-semibold text-gray-400 mb-1 uppercase tracking-wider">Ubicación Registrada</label>
+                    <select id="edit_ubi_id" name="ubi_id"
+                        class="bg-[#12141c] border border-gray-700 text-white rounded-lg p-2.5 w-full text-sm focus:border-blue-500 outline-none">
+                        @foreach($ubicaciones as $ubi)
+                            <option value="{{ $ubi->ubi_id }}" data-nombre="{{ strtoupper(trim($ubi->ubi_nombre)) }}">
+                                {{ $ubi->ubi_nombre }}
+                            </option>
                         @endforeach
+                    </select>
+                </div>
+            </div>
+
+            <!-- FILA 6: Constatación y Alerta de Movimiento -->
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4 pt-2 border-t border-gray-800/80">
+                <div>
+                    <label class="block text-[11px] font-semibold text-gray-400 mb-1 uppercase tracking-wider">Estado de Constatación</label>
+                    <select id="edit_constatado" name="constatado_actual"
+                        class="bg-[#12141c] border border-gray-700 text-white rounded-lg p-2.5 w-full text-sm focus:border-blue-500 outline-none">
+                        <option value="CENSADO">CENSADO</option>
+                        <option value="PENDIENTE">PENDIENTE</option>
+                        <option value="NO LOCALIZADO">NO LOCALIZADO</option>
                     </select>
                 </div>
 
                 <div>
-                    <label class="block text-xs font-semibold text-gray-400 mb-1 uppercase">Estado Físico</label>
-                    <select name="est_id" id="edit_est_id" class="bg-[#12141c] border border-gray-700 text-white rounded-lg p-2.5 w-full text-sm focus:ring-2 focus:ring-blue-500 outline-none appearance-none">
-                        <option value="">Seleccionar Estado</option>
-                        @foreach($estados as $estado)
-                            <option value="{{ $estado->est_id }}">{{ $estado->est_nombre }}</option>
-                        @endforeach
+                    <label class="block text-[11px] font-semibold text-gray-400 mb-1 uppercase tracking-wider">Alerta de Movimiento</label>
+                    <select id="edit_alerta" name="alerta_movimiento"
+                        class="bg-[#12141c] border border-gray-700 text-white rounded-lg p-2.5 w-full text-sm focus:border-blue-500 outline-none">
+                        <option value="SIN VARIACIÓN">SIN VARIACIÓN</option>
+                        <option value="REUBICADO">REUBICADO</option>
+                        <option value="ALTA NUEVA">ALTA NUEVA</option>
+                        <option value="NUEVO REGISTRO">NUEVO REGISTRO</option>
                     </select>
                 </div>
+            </div>
 
+            <!-- FILA 7: Datos Informativos de Auditoría -->
+            <div class="bg-[#12141c] border border-gray-800/90 rounded-xl p-3.5 grid grid-cols-2 sm:grid-cols-3 gap-3 text-xs">
                 <div>
-                    <label class="block text-xs font-semibold text-gray-400 mb-1 uppercase">Ubicación Registrada</label>
-                    <select name="ubi_id" id="edit_ubi_id" class="bg-[#12141c] border border-gray-700 text-white rounded-lg p-2.5 w-full text-sm focus:ring-2 focus:ring-blue-500 outline-none appearance-none">
-                        <option value="">Seleccionar Ubicación</option>
-                        @foreach($ubicaciones as $ubicacion)
-                            <option value="{{ $ubicacion->ubi_id }}">{{ $ubicacion->ubi_nombre }}</option>
-                        @endforeach
-                    </select>
+                    <span class="text-gray-500 block uppercase text-[10px] font-semibold">Año de Auditoría</span>
+                    <span id="info_anio" class="text-gray-200 font-bold">-</span>
                 </div>
+                <div>
+                    <span class="text-gray-500 block uppercase text-[10px] font-semibold">Fecha Censo</span>
+                    <span id="info_fecha" class="text-gray-200 font-semibold">-</span>
+                </div>
+                <div class="col-span-2 sm:col-span-1">
+                    <span class="text-gray-500 block uppercase text-[10px] font-semibold">Código Activo</span>
+                    <span id="info_id" class="text-blue-400 font-mono">-</span>
+                </div>
+            </div>
 
-                <div class="flex items-center justify-start space-x-3 mt-6 pt-4 border-t border-gray-700 col-span-2">
-                    <button type="submit" class="px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-lg text-sm font-medium shadow-lg transition">
-                        Guardar Cambios
-                    </button>
-                </div>
+            <div class="flex justify-between items-center pt-4 border-t border-gray-800">
+                <button type="submit" class="bg-blue-600 hover:bg-blue-500 text-white font-bold px-5 py-2.5 rounded-lg text-sm transition shadow-lg cursor-pointer">
+                    Guardar Cambios
+                </button>
+                <button type="button" onclick="cerrarModalEditar()" class="bg-gray-800 hover:bg-gray-700 text-gray-300 px-4 py-2.5 rounded-lg text-sm font-medium transition cursor-pointer">
+                    Cancelar
+                </button>
             </div>
         </form>
     </div>
 </div>
-
-<!-- Scripts de Gráficos y Modales -->
-<script>
-    function cambiarPestana(pestana) {
-        const contResumen = document.getElementById('contenido-resumen');
-        const contTrazabilidad = document.getElementById('contenido-trazabilidad');
-        const btnResumen = document.getElementById('btn-resumen');
-        const btnTrazabilidad = document.getElementById('btn-trazabilidad');
-
-        const claseActiva = ['border-b-2', 'border-white', 'font-semibold', 'text-white'];
-        const claseInactiva = ['text-gray-400', 'hover:text-gray-200'];
-
-        if (pestana === 'resumen') {
-            contResumen.style.display = 'block';
-            contTrazabilidad.style.display = 'none';
-            
-            btnResumen.classList.add(...claseActiva);
-            btnResumen.classList.remove(...claseInactiva);
-            btnTrazabilidad.classList.remove(...claseActiva);
-            btnTrazabilidad.classList.add(...claseInactiva);
-
-            localStorage.setItem('dashboardTab', 'resumen');
-        } else {
-            contResumen.style.display = 'none';
-            contTrazabilidad.style.display = 'block';
-            
-            btnTrazabilidad.classList.add(...claseActiva);
-            btnTrazabilidad.classList.remove(...claseInactiva);
-            btnResumen.classList.remove(...claseActiva);
-            btnResumen.classList.add(...claseInactiva);
-
-            localStorage.setItem('dashboardTab', 'trazabilidad');
-        }
-    }
-
-    function abrirModalEdicion(codigo, denominacion, marca, modelo, tipo, color, dimensiones, estado, ubicacion) {
-        const urlUpdate = "{{ route('admin.activos.update', ':codigo') }}".replace(':codigo', codigo);
-        document.getElementById('formEditarActivo').action = urlUpdate;
-
-        document.getElementById('edit_codigo').value = codigo;
-        document.getElementById('edit_denominacion').value = denominacion;
-        document.getElementById('edit_dimensiones').value = dimensiones;
-        
-        function seleccionarPorTexto(selectId, texto) {
-            const select = document.getElementById(selectId);
-            if (!select || !texto) return;
-            for (let i = 0; i < select.options.length; i++) {
-                if (select.options[i].text.trim().toUpperCase() === texto.trim().toUpperCase()) {
-                    select.selectedIndex = i;
-                    break;
-                }
-            }
-        }
-
-        seleccionarPorTexto('edit_mar_id', marca);
-        seleccionarPorTexto('edit_mod_id', modelo);
-        seleccionarPorTexto('edit_cla_id', tipo);
-        seleccionarPorTexto('edit_col_id', color);
-        seleccionarPorTexto('edit_est_id', estado);
-        seleccionarPorTexto('edit_ubi_id', ubicacion);
-
-        document.getElementById('modalEditar').classList.remove('hidden');
-    }
-
-    function cerrarModalEdicion() {
-        document.getElementById('modalEditar').classList.add('hidden');
-    }
-
-    document.addEventListener('DOMContentLoaded', function() {
-        // =========================================================
-        // 1. AUTO-DETECCIÓN DE PESTAÑAS Y FILTROS
-        // =========================================================
-        const urlParams = new URLSearchParams(window.location.search);
-        const hayFiltros = urlParams.has('buscar') || 
-                           urlParams.has('ubicacion') || 
-                           urlParams.has('estado') || 
-                           urlParams.has('alerta') || 
-                           urlParams.has('page');
-        
-        let tabGuardada = localStorage.getItem('dashboardTab') || 'resumen';
-        
-        if (hayFiltros) {
-            tabGuardada = 'trazabilidad';
-        }
-        
-        cambiarPestana(tabGuardada);
-
-        // =========================================================
-        // 2. INICIALIZACIÓN DE GRÁFICOS (Chart.js)
-        // =========================================================
-        Chart.defaults.color = '#9ca3af';
-        Chart.defaults.borderColor = '#374151';
-
-        // Gráfico de Avance por Ubicación
-        const ctxUbi = document.getElementById('chartUbicaciones');
-        if (ctxUbi) {
-            new Chart(ctxUbi.getContext('2d'), {
-                type: 'bar',
-                data: {
-                    labels: {!! json_encode($chartUbiLabels ?? []) !!},
-                    datasets: [
-                        { label: 'Verificados', backgroundColor: '#2563eb', data: {!! json_encode($chartUbiVerificados ?? []) !!}, barPercentage: 0.6, categoryPercentage: 0.8 },
-                        { label: 'Pendientes', backgroundColor: '#4b5563', data: {!! json_encode($chartUbiPendientes ?? []) !!}, barPercentage: 0.6, categoryPercentage: 0.8 }
-                    ]
-                },
-                options: { indexAxis: 'y', responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { x: { stacked: true, grid: { color: '#1f2937' } }, y: { stacked: true, grid: { display: false } } } }
-            });
-        }
-
-        // Gráfico de Activos por Estado
-        const ctxEst = document.getElementById('chartEstados');
-        if (ctxEst) {
-            new Chart(ctxEst.getContext('2d'), {
-                type: 'doughnut',
-                data: {
-                    labels: {!! json_encode($chartEstLabels ?? []) !!},
-                    datasets: [{ data: {!! json_encode($chartEstData ?? []) !!}, backgroundColor: ['#10b981', '#ef4444', '#3b82f6', '#f59e0b', '#8b5cf6', '#6b7280'], borderWidth: 0 }]
-                },
-                options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'bottom' } }, cutout: '70%' }
-            });
-        }
-
-        // Gráfico de Tipos de Activos
-        const ctxTipos = document.getElementById('chartTipos');
-        if (ctxTipos) {
-            new Chart(ctxTipos.getContext('2d'), {
-                type: 'bar',
-                data: {
-                    labels: {!! json_encode($chartTipoLabels ?? []) !!},
-                    datasets: [{ label: 'Cantidad', data: {!! json_encode($chartTipoData ?? []) !!}, backgroundColor: ['#8b5cf6', '#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#14b8a6', '#6366f1'], borderRadius: 4 }]
-                },
-                options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true, grid: { color: '#1f2937' }, ticks: { stepSize: 1 } }, x: { grid: { display: false }, ticks: { callback: function(val) { let lbl = this.getLabelForValue(val); return lbl.length > 15 ? lbl.substr(0, 15) + '...' : lbl; } } } } }
-            });
-        }
-    });
-
-    function abrirModalNuevo() {
-        document.getElementById('modalNuevo').classList.remove('hidden');
-    }
-
-    function cerrarModalNuevo() {
-        document.getElementById('modalNuevo').classList.add('hidden');
-    }
-</script>
 
 <!-- ================= MODAL FLOTANTE DE NUEVO ACTIVO ================= -->
 <div id="modalNuevo" class="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center hidden p-4">
@@ -642,4 +571,172 @@
         </form>
     </div>
 </div>
+
+<!-- Scripts de Gráficos y Modales -->
+<script>
+    function cambiarPestana(pestana) {
+        const contResumen = document.getElementById('contenido-resumen');
+        const contTrazabilidad = document.getElementById('contenido-trazabilidad');
+        const btnResumen = document.getElementById('btn-resumen');
+        const btnTrazabilidad = document.getElementById('btn-trazabilidad');
+
+        const claseActiva = ['border-b-2', 'border-white', 'font-semibold', 'text-white'];
+        const claseInactiva = ['text-gray-400', 'hover:text-gray-200'];
+
+        if (pestana === 'resumen') {
+            contResumen.style.display = 'block';
+            contTrazabilidad.style.display = 'none';
+            
+            btnResumen.classList.add(...claseActiva);
+            btnResumen.classList.remove(...claseInactiva);
+            btnTrazabilidad.classList.remove(...claseActiva);
+            btnTrazabilidad.classList.add(...claseInactiva);
+
+            localStorage.setItem('dashboardTab', 'resumen');
+        } else {
+            contResumen.style.display = 'none';
+            contTrazabilidad.style.display = 'block';
+            
+            btnTrazabilidad.classList.add(...claseActiva);
+            btnTrazabilidad.classList.remove(...claseInactiva);
+            btnResumen.classList.remove(...claseActiva);
+            btnResumen.classList.add(...claseInactiva);
+
+            localStorage.setItem('dashboardTab', 'trazabilidad');
+        }
+    }
+
+    function seleccionarPorTextoOId(selectId, valorId, valorTexto) {
+        const select = document.getElementById(selectId);
+        if (!select) return;
+
+        if (valorId !== undefined && valorId !== null && valorId !== '') {
+            select.value = valorId;
+            if (select.value == valorId) return;
+        }
+
+        const textoBuscado = (valorTexto || '').toString().trim().toUpperCase();
+        for (let opt of select.options) {
+            const nombreOpt = (opt.getAttribute('data-nombre') || opt.text).trim().toUpperCase();
+            if (nombreOpt === textoBuscado) {
+                select.value = opt.value;
+                return;
+            }
+        }
+        select.selectedIndex = 0;
+    }
+
+    function filtrarModelosEditar() {
+        const marId = document.getElementById('edit_mar_id').value;
+        const selectModelo = document.getElementById('edit_mod_id');
+
+        for (let opt of selectModelo.options) {
+            if (!opt.value) continue;
+            const modMarId = opt.getAttribute('data-mar-id');
+            opt.style.display = (!marId || modMarId === marId) ? '' : 'none';
+        }
+    }
+
+    function abrirModalEditar(reg) {
+        const urlUpdate = "{{ route('admin.activos.update', ':codigo') }}".replace(':codigo', reg.codigo_patrimonial);
+        document.getElementById('formEditarActivo').action = urlUpdate;
+
+        document.getElementById('edit_codigo').value = reg.codigo_patrimonial || '';
+        document.getElementById('edit_denominacion').value = reg.denominacion || '';
+        document.getElementById('edit_serie').value = reg.serie || 'SIN SERIE';
+        document.getElementById('edit_dimensiones').value = reg.dimensiones || 'SIN DIMENSIONES';
+
+        seleccionarPorTextoOId('edit_mar_id', reg.mar_id, reg.marca);
+        filtrarModelosEditar();
+        seleccionarPorTextoOId('edit_mod_id', reg.mod_id, reg.modelo);
+        seleccionarPorTextoOId('edit_cla_id', reg.cla_id, reg.tipo);
+        seleccionarPorTextoOId('edit_col_id', reg.col_id, reg.color);
+        seleccionarPorTextoOId('edit_est_id', reg.est_id, reg.estado);
+        seleccionarPorTextoOId('edit_ubi_id', reg.ubi_id, reg.ubicacion);
+
+        document.getElementById('edit_constatado').value = (reg.constatado_actual || 'CENSADO').toUpperCase();
+        document.getElementById('edit_alerta').value = (reg.alerta_movimiento || 'SIN VARIACIÓN').toUpperCase();
+
+        document.getElementById('info_anio').textContent = reg.anio_auditoria || '{{ $periodoActual->per_anio ?? date("Y") }}';
+        document.getElementById('info_fecha').textContent = reg.fecha_censo || 'Registrado';
+        document.getElementById('info_id').textContent = reg.codigo_patrimonial || '-';
+
+        const modal = document.getElementById('modalEditarActivo');
+        modal.classList.remove('hidden');
+        modal.classList.add('flex');
+    }
+
+    function cerrarModalEditar() {
+        const modal = document.getElementById('modalEditarActivo');
+        modal.classList.add('hidden');
+        modal.classList.remove('flex');
+    }
+
+    function abrirModalNuevo() {
+        document.getElementById('modalNuevo').classList.remove('hidden');
+    }
+
+    function cerrarModalNuevo() {
+        document.getElementById('modalNuevo').classList.add('hidden');
+    }
+
+    document.addEventListener('DOMContentLoaded', function() {
+        const urlParams = new URLSearchParams(window.location.search);
+        const hayFiltros = urlParams.has('buscar') || 
+                           urlParams.has('ubicacion') || 
+                           urlParams.has('estado') || 
+                           urlParams.has('alerta') || 
+                           urlParams.has('page');
+        
+        let tabGuardada = localStorage.getItem('dashboardTab') || 'resumen';
+        
+        if (hayFiltros) {
+            tabGuardada = 'trazabilidad';
+        }
+        
+        cambiarPestana(tabGuardada);
+
+        Chart.defaults.color = '#9ca3af';
+        Chart.defaults.borderColor = '#374151';
+
+        const ctxUbi = document.getElementById('chartUbicaciones');
+        if (ctxUbi) {
+            new Chart(ctxUbi.getContext('2d'), {
+                type: 'bar',
+                data: {
+                    labels: {!! json_encode($chartUbiLabels ?? []) !!},
+                    datasets: [
+                        { label: 'Verificados', backgroundColor: '#2563eb', data: {!! json_encode($chartUbiVerificados ?? []) !!}, barPercentage: 0.6, categoryPercentage: 0.8 },
+                        { label: 'Pendientes', backgroundColor: '#4b5563', data: {!! json_encode($chartUbiPendientes ?? []) !!}, barPercentage: 0.6, categoryPercentage: 0.8 }
+                    ]
+                },
+                options: { indexAxis: 'y', responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { x: { stacked: true, grid: { color: '#1f2937' } }, y: { stacked: true, grid: { display: false } } } }
+            });
+        }
+
+        const ctxEst = document.getElementById('chartEstados');
+        if (ctxEst) {
+            new Chart(ctxEst.getContext('2d'), {
+                type: 'doughnut',
+                data: {
+                    labels: {!! json_encode($chartEstLabels ?? []) !!},
+                    datasets: [{ data: {!! json_encode($chartEstData ?? []) !!}, backgroundColor: ['#10b981', '#ef4444', '#3b82f6', '#f59e0b', '#8b5cf6', '#6b7280'], borderWidth: 0 }]
+                },
+                options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'bottom' } }, cutout: '70%' }
+            });
+        }
+
+        const ctxTipos = document.getElementById('chartTipos');
+        if (ctxTipos) {
+            new Chart(ctxTipos.getContext('2d'), {
+                type: 'bar',
+                data: {
+                    labels: {!! json_encode($chartTipoLabels ?? []) !!},
+                    datasets: [{ label: 'Cantidad', data: {!! json_encode($chartTipoData ?? []) !!}, backgroundColor: ['#8b5cf6', '#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#14b8a6', '#6366f1'], borderRadius: 4 }]
+                },
+                options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true, grid: { color: '#1f2937' }, ticks: { stepSize: 1 } }, x: { grid: { display: false }, ticks: { callback: function(val) { let lbl = this.getLabelForValue(val); return lbl.length > 15 ? lbl.substr(0, 15) + '...' : lbl; } } } } }
+            });
+        }
+    });
+</script>
 @endsection

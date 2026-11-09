@@ -1,25 +1,37 @@
 <?php
-
 namespace Database\Seeders;
 
-use App\Models\User;
-use Illuminate\Database\Console\Seeds\WithoutModelEvents;
 use Illuminate\Database\Seeder;
+use App\Models\Rol;
+use App\Models\Usuario;
+use App\Models\PeriodoFiscal;
+use Illuminate\Support\Facades\Hash;
 
 class DatabaseSeeder extends Seeder
 {
-    use WithoutModelEvents;
-
-    /**
-     * Seed the application's database.
-     */
-    public function run(): void
+    public function run()
     {
-        // User::factory(10)->create();
+        // 1. Crear Roles
+        Rol::firstOrCreate(['rol_id' => 1], ['rol_nombre' => 'Administrador']);
+        Rol::firstOrCreate(['rol_id' => 2], ['rol_nombre' => 'Operador']);
 
-        User::factory()->create([
-            'name' => 'Test User',
-            'email' => 'test@example.com',
-        ]);
+        // 2. Crear Usuario Administrador por defecto
+        Usuario::firstOrCreate(
+            ['usu_correo' => 'admin@admin.com'],
+            [
+                'usu_dni' => '12345678',
+                'usu_nombres' => 'Admin',
+                'usu_apellidos' => 'Sistema',
+                'password' => Hash::make('password'),
+                'rol_id' => 1,
+                'usu_activo' => 1
+            ]
+        );
+
+        // 3. Crear Periodo Fiscal Inicial
+        PeriodoFiscal::firstOrCreate(
+            ['per_anio' => 2026],
+            ['per_cerrado' => 0]
+        );
     }
 }
