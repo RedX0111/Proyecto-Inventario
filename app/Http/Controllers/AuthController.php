@@ -5,7 +5,7 @@ namespace App\Http\Controllers;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
-use App\Models\User;
+use App\Models\Usuario;
 
 class AuthController extends Controller
 {
@@ -28,7 +28,7 @@ class AuthController extends Controller
         ]);
 
         // 1. Buscar el usuario por DNI
-        $user = User::where('usu_dni', $request->usu_dni)->first();
+        $user = Usuario::where('usu_dni', $request->usu_dni)->first();
 
         // 2. Validar si existe
         if (!$user) {
